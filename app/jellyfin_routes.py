@@ -103,7 +103,7 @@ def add_playlist():
                 db.session.execute(stmt)
                 db.session.commit()
         
-        update_playlist_metadata(playlist,playlist_data)
+        functions.update_playlist_metadata(playlist,playlist_data)
         
         if playlist not in user.playlists:
             user.playlists.append(playlist)
