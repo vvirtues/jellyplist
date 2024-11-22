@@ -1,4 +1,4 @@
-name: Build and Release on Main
+name: Build and Release on Tag
 
 on:
   push:
@@ -14,11 +14,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      # Extract version from version.py
+      # Extract the tag version
       - name: Extract Version
         id: extract_version
         run: |
-          version=$(python3 -c "import version; print(version.__version__)")
+          version=${GITHUB_REF#refs/tags/}
           echo "VERSION=$version" >> $GITHUB_ENV
 
       # Set up Docker
@@ -39,7 +39,7 @@ jobs:
         with:
           context: .
           push: true
-          tags: ghcr.io/${{ github.repository}}:${{ env.VERSION }}
+          tags: ghcr.io/${{ github.repository }}:${{ env.VERSION }}
 
       # Create a release on GitHub
       - name: Create GitHub Release
@@ -48,6 +48,5 @@ jobs:
           tag_name: ${{ env.VERSION }}
           name: Release ${{ env.VERSION }}
           generate_release_notes: true
-
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
