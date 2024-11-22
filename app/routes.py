@@ -39,22 +39,24 @@ def task_manager():
 def link_issues():
     unlinked_tracks = Track.query.filter_by(downloaded=True,jellyfin_id=None).all()
     tracks = []
-    # for ult in unlinked_tracks: 
-    #     sp_track = functions.get_cached_spotify_track(ult.spotify_track_id)
-        
-    #     tracks.append({
-    #             'title': sp_track['name'],
-    #             'artist': ', '.join([artist['name'] for artist in sp_track['artists']]),
-    #             'url': sp_track['external_urls']['spotify'],
-    #             'duration': f'{minutes}:{seconds:02d}', 
-    #             'preview_url': sp_track['preview_url'],
-    #             'downloaded': ult.downloaded,  
-    #             'filesystem_path': utl.filesystem_path,  
-    #             'jellyfin_id': ult.jellyfin_id,
-    #             'spotify_id': sp_track['id'],
-    #             'duration_ms': duration_ms,
-    #             'download_status'  : download_status
-    #         })
+    for ult in unlinked_tracks: 
+        sp_track = functions.get_cached_spotify_track(ult.spotify_track_id)
+        duration_ms = sp_track['duration_ms']
+        minutes = duration_ms // 60000
+        seconds = (duration_ms % 60000) // 1000
+        tracks.append({
+                'title': sp_track['name'],
+                'artist': ', '.join([artist['name'] for artist in sp_track['artists']]),
+                'url': sp_track['external_urls']['spotify'],
+                'duration': f'{minutes}:{seconds:02d}', 
+                'preview_url': sp_track['preview_url'],
+                'downloaded': ult.downloaded,  
+                'filesystem_path': ult.filesystem_path,  
+                'jellyfin_id': ult.jellyfin_id,
+                'spotify_id': sp_track['id'],
+                'duration_ms': duration_ms,
+                'download_status'  : ult.download_status
+            })
 
     return render_template('admin/link_issues.html' , tracks = tracks )
 
