@@ -126,7 +126,7 @@ volumes:
 
 - _Why have I to provide a Jellyfin Admin and Password instead of a API Token ?_
 
-Its beccause of some limitations in the Jellyfin API. The goal of Jellyplist was to always maintain only one copy of a playlist in Jellyfin and to use SharedPlaylists which are "owned" by one admin user. 
+Its because of some limitations in the Jellyfin API. The goal of Jellyplist was to always maintain only one copy of a playlist in Jellyfin and to use SharedPlaylists which are "owned" by one admin user. 
 
 - _Why so many containers?_
 
@@ -137,6 +137,10 @@ No. Jellyplist at first tries to match the track from a Spotify playlist with a 
 
 > [!CAUTION]
 > The Jellyfin API esp. the search API has some serious problems with apostrophes and other special characters, resulting in no search results at all. In such cases you have to do the link between a Spotify Track ID and your Jellyfin Track ID manually through the UI. 
+
+- _What about Spotify API rate limits ?_ 
+
+Jellyplist will cache requests where possible. Especially the `/tracks` endpoint is queried a lot, therefore the results are cached for 10 days. 
 
 
 ## Usage
