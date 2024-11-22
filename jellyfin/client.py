@@ -182,7 +182,7 @@ class JellyfinClient:
         """
         search_url = f'{self.base_url}/Items'
         params = {
-            'SearchTerm': search_query,
+            'SearchTerm': search_query.replace('\'',"´").replace('’','´'),
             
             'IncludeItemTypes': 'Audio',  # Search only for audio items
             'Recursive': 'true',          # Search within all folders
