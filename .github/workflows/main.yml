@@ -17,7 +17,7 @@ jobs:
       - name: Extract Version
         id: extract_version
         run: |
-          version=$(python3 -c "from app import version; print(version.__version__)")
+          version=$(python3 -c "import version; print(version.__version__)")
           echo "VERSION=$version" >> $GITHUB_ENV
 
       # Set up Docker
