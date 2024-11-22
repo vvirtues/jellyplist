@@ -14,11 +14,10 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      # Extract the tag version
       - name: Extract Version
         id: extract_version
         run: |
-          version=${GITHUB_REF#refs/tags/}
+          version=$(python3 -c "import version; print(version.__version__)")
           echo "VERSION=$version" >> $GITHUB_ENV
 
       # Set up Docker
