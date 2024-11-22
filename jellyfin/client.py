@@ -182,7 +182,8 @@ class JellyfinClient:
         """
         search_url = f'{self.base_url}/Items'
         params = {
-            'SearchTerm': _clean_query(search_query),
+            'SearchTerm': search_query,
+            
             'IncludeItemTypes': 'Audio',  # Search only for audio items
             'Recursive': 'true',          # Search within all folders
             'Fields': 'Name,Id,Album,Artists,Path'           # Retrieve the name and ID of the song
