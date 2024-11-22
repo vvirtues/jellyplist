@@ -5,7 +5,6 @@ import sys
 class Config:
     SECRET_KEY = os.getenv('SECRET_KEY')  
     JELLYFIN_SERVER_URL = os.getenv('JELLYFIN_SERVER_URL')  
-    JELLYFIN_ACCESS_TOKEN = os.getenv('JELLYFIN_ACCESS_TOKEN')
     JELLYFIN_ADMIN_USER = os.getenv('JELLYFIN_ADMIN_USER')
     JELLYFIN_ADMIN_PASSWORD = os.getenv('JELLYFIN_ADMIN_PASSWORD')
     SPOTIPY_CLIENT_ID = os.getenv('SPOTIPY_CLIENT_ID')
@@ -35,7 +34,6 @@ class Config:
         required_vars = {
             'SECRET_KEY': cls.SECRET_KEY,
             'JELLYFIN_SERVER_URL': cls.JELLYFIN_SERVER_URL,
-            'JELLYFIN_ACCESS_TOKEN': cls.JELLYFIN_ACCESS_TOKEN,
             'JELLYFIN_ADMIN_USER': cls.JELLYFIN_ADMIN_USER,
             'JELLYFIN_ADMIN_PASSWORD': cls.JELLYFIN_ADMIN_PASSWORD,
             'SPOTIPY_CLIENT_ID': cls.SPOTIPY_CLIENT_ID,
