@@ -1,0 +1,12 @@
+{% if item.can_add %}
+<button class="btn btn-success" hx-post="/addplaylist" hx-include="this" hx-swap="outerHTML" hx-target="this"
+  data-bs-toggle="tooltip" title="Add to my Jellyfin"
+  hx-vals='{"item_id": "{{ item.id }}", "item_name": "{{ item.name }}"}'>
+  <i class="fa-solid fa-circle-plus"> </i>
+</button>
+{% elif item.can_remove %}
+<button class="btn btn-warning" hx-delete="{{ url_for('delete_playlist', playlist_id=item['jellyfin_id']) }}"
+  hx-include="this" hx-swap="outerHTML" hx-target="this" data-bs-toggle="tooltip" title="Remove from Jellyfin">
+  <i class="fa-solid fa-circle-minus"> </i>
+</button>
+{% endif %}

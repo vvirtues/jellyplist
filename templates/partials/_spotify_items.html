@@ -1,0 +1,24 @@
+{% for item in items %}
+  {% include 'partials/_spotify_item.html' %}
+
+{% endfor %}
+
+{% if next_offset < total_items %}
+    <div hx-get="{{ endpoint }}?offset={{ next_offset }}{{ additional_query }}" 
+         hx-trigger="revealed" 
+         hx-swap="beforeend" 
+         hx-indicator=".loading-indicator"
+         hx-target="#items-container"
+         class="loading-indicator text-center">
+        Loading more items...
+    </div>
+{% endif %}
+
+<script>
+  // Show the loading indicator only when it is active
+  document.querySelectorAll('.loading-indicator').forEach(indicator => {
+    indicator.addEventListener('htmx:afterRequest', () => {
+      indicator.style.display = 'none';  // Hide the indicator after the request completes
+    });
+  });
+</script>

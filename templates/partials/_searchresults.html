@@ -1,0 +1,31 @@
+
+
+
+    {% if playlists %}
+        <h1 class="mb-4">Playlists</h1>
+        <div class="row row-cols-1 row-cols-md-4 g-4">
+            {% for item in playlists %}
+                {% include 'partials/_spotify_item.html' %}
+            {% endfor %}
+        </div>
+    {% endif %}
+    
+    {% if albums %}
+        <h1 class="mb-4">Albums</h1>
+        <div class="row row-cols-1 row-cols-md-4 g-4">
+
+        {% for item in albums %}
+            {% include 'partials/_spotify_item.html' %}
+        {% endfor %}
+        </div>
+    {% endif %}
+    {% if artists %}
+        <h1 class="mb-4">Artists</h1>
+        <div class="row row-cols-1 row-cols-md-4 g-4">
+
+        {% for item in artists %}
+            {% include 'partials/_spotify_item.html' %}
+        {% endfor %}
+        </div>
+    {% endif %}
+

@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1 >Your subscribed Jellyfin Playlists</h1>
+<h6 ></h6>
+<div class="row row-cols-1 row-cols-md-4 row-cols-lg-6 g-4" id="items-container">
+    {% for item in playlists %}
+  {% include 'partials/_spotify_item.html' %}
+
+{% endfor %}
+    
+</div>
+
+{% endblock %}
+

@@ -1,0 +1,37 @@
+<div id="empty"></div>
+<div class="search-results">
+    {% if results %}
+    <table class="table table-striped">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Artist(s)</th>
+          <th>Path</th>
+          <th></th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for track in results %}
+        <tr>
+          <td>{{ track.Name }}</td>
+          <td>{{ ', '.join(track.Artists) }}</td>
+          <td>{{ track.Path}}</td>
+          <td>
+            <button class="btn btn-sm btn-primary" onclick="playJellyfinTrack(this, '{{ track.Id }}')">
+              <i class="fas fa-play"></i>
+            </button>
+          </td>
+          <td>
+            <button hx-swap="beforebegin" class="btn btn-sm btn-success" hx-post="/associate_track" hx-vals='{"jellyfin_id": "{{ track.Id }}","spotify_id": "{{ spotify_id}}"}'>
+              Associate Track
+            </button>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+      <p>No results found.</p>
+    {% endif %}
+  </div>

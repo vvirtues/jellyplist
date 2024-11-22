@@ -1,0 +1,21 @@
+{% extends "admin.html" %}
+{% block admin_content %}
+<div class="container mt-5">
+
+    <!-- Tabelle für den Task-Status -->
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Task Name</th>
+                <th>Status</th>
+                <th>Progress</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <!-- Das Partial wird dynamisch über HTMX geladen -->
+        <tbody id="task-status" hx-get="/task_status" hx-trigger="every 1s" hx-swap="innerHTML">
+            {% include 'partials/_task_status.html' %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

@@ -1,189 +1,151 @@
-import atexit
 from logging.handlers import RotatingFileHandler
 import os
-from flask import Flask
+import time
+from flask_socketio import SocketIO
+
+import sys
+from flask import Flask, has_request_context
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
+from psycopg2 import OperationalError
 import spotipy
-from spotipy.oauth2 import SpotifyOAuth, SpotifyClientCredentials
+from spotipy.oauth2 import  SpotifyClientCredentials
 from celery import Celery
+from celery.schedules import crontab
+from sqlalchemy import create_engine
 from config import Config
 from jellyfin.client import JellyfinClient
 import logging
-from spotdl import Spotdl
 from spotdl.utils.config import DEFAULT_CONFIG
+from flask_caching import Cache
+from .version import __version__
 
-app = Flask(__name__, template_folder="../templates")
+
+def check_db_connection(db_uri, retries=5, delay=5):
+    """
+    Check if the database is reachable.
+
+    Args:
+        db_uri (str): The database URI.
+        retries (int): Number of retry attempts.
+        delay (int): Delay between retries in seconds.
+
+    Raises:
+        SystemExit: If the database is not reachable after retries.
+    """
+    for attempt in range(1, retries + 1):
+        try:
+            engine = create_engine(db_uri)
+            connection = engine.connect()
+            connection.close()
+            app.logger.info("Successfully connected to the database.")
+            return
+        except OperationalError as e:
+            app.logger.error(f"Database connection failed on attempt {attempt}/{retries}: {e}")
+            if attempt < retries:
+                app.logger.info(f"Retrying in {delay} seconds...")
+                time.sleep(delay)
+            else:
+                app.logger.critical("Could not connect to the database. Exiting application.")
+                sys.exit(1)
+
+# Celery setup
+def make_celery(app):
+    celery = Celery(
+        app.import_name,
+        backend=app.config['result_backend'],  
+        broker=app.config['CELERY_BROKER_URL'],
+        include=['app.tasks']  
+    )
+    celery.conf.update(app.config)
+    # Configure Celery Beat schedule
+    celery.conf.beat_schedule = {
+        'download-missing-tracks-schedule': {
+            'task': 'app.tasks.download_missing_tracks',
+            'schedule': crontab(minute='30'),  
+        },
+        'check-playlist-updates-schedule': {
+            'task': 'app.tasks.check_for_playlist_updates',
+            'schedule': crontab(minute='25'),  
+        },
+        'update_all_playlists_track_status-schedule': {
+            'task': 'app.tasks.update_all_playlists_track_status',
+            'schedule': crontab(minute='*/2'),  
+            
+        },
+        'update_jellyfin_id_for_downloaded_tracks-schedule': {
+            'task': 'app.tasks.update_jellyfin_id_for_downloaded_tracks',
+            'schedule': crontab(minute='*/10'),  
+            
+        }
+    }
+    
+    celery.conf.timezone = 'UTC'
+    return celery
+
+log_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s : %(message)s')
+
+# Why this ? Because we are using the same admin login for web, worker and beat we need to distinguish the device_id´s
+device_id = f'JellyPlist_{'_'.join(sys.argv)}'
+
+# Initialize Flask app
+app = Flask(__name__, template_folder="../templates", static_folder='../static')
+# log_file = 'app.log'
+# handler = RotatingFileHandler(log_file, maxBytes=100000, backupCount=3)
+# handler.setLevel(logging.DEBUG)
+# handler.setFormatter(log_formatter)
+# stream_handler = logging.StreamHandler(sys.stdout)
+# stream_handler.setLevel(logging.DEBUG)
+# stream_handler.setFormatter(log_formatter)
+
+
+# # app.logger.addHandler(handler)
+# app.logger.addHandler(stream_handler)
+
 app.config.from_object(Config)
-sp = spotipy.Spotify(auth_manager= SpotifyClientCredentials(client_id=app.config['SPOTIPY_CLIENT_ID'], client_secret=app.config['SPOTIPY_CLIENT_SECRET']))
+app.logger.setLevel(logging.DEBUG)
+Config.validate_env_vars()
+cache = Cache(app)
+
+
+# Spotify, Jellyfin, and Spotdl setup
+app.logger.info(f"setting up spotipy")
+sp = spotipy.Spotify(auth_manager=SpotifyClientCredentials(
+    client_id=app.config['SPOTIPY_CLIENT_ID'],
+    client_secret=app.config['SPOTIPY_CLIENT_SECRET']
+))
+
+app.logger.info(f"setting up jellyfin client")
+
 jellyfin = JellyfinClient(app.config['JELLYFIN_SERVER_URL'])
-spotdl_config = DEFAULT_CONFIG
+jellyfin_admin_token, jellyfin_admin_id, jellyfin_admin_name, jellyfin_admin_is_admin = jellyfin.login_with_password(
+    app.config['JELLYFIN_ADMIN_USER'],
+    app.config['JELLYFIN_ADMIN_PASSWORD'], device_id= device_id
+)
 
-spotdl_config['cookie_file'] = '/jellyplist/cookies.txt'
-spotdl_config['output'] = '/storage/media/music/_spotify_playlists/{track-id}'
-spotdl_config['threads'] = 12
-spotdl = Spotdl( app.config['SPOTIPY_CLIENT_ID'],app.config['SPOTIPY_CLIENT_SECRET'], downloader_settings=spotdl_config)
-
-
-
-# Configurations
-app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://jellyplist:jellyplist@192.168.178.14/jellyplist'
+# SQLAlchemy and Migrate setup
+app.logger.info(f"connecting to db: {app.config['JELLYPLIST_DB_HOST']}")
+check_db_connection(f'postgresql://{app.config["JELLYPLIST_DB_USER"]}:{app.config["JELLYPLIST_DB_PASSWORD"]}@{app.config["JELLYPLIST_DB_HOST"]}/jellyplist',retries=5,delay=2)
+app.config['SQLALCHEMY_DATABASE_URI'] = f'postgresql://{app.config['JELLYPLIST_DB_USER']}:{app.config['JELLYPLIST_DB_PASSWORD']}@{app.config['JELLYPLIST_DB_HOST']}/jellyplist'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-
 db = SQLAlchemy(app)
+app.logger.info(f"applying db migrations")
 migrate = Migrate(app, db)
 
-# Configure Logging
-log_file = 'app.log'
-handler = RotatingFileHandler(log_file, maxBytes=100000, backupCount=3)  # 100KB per file, with 3 backups
-handler.setLevel(logging.INFO)
-
-app.logger.info('Application started')
-
-from app import routes, models
-from app.models import JellyfinUser,Track,Playlist
-from apscheduler.schedulers.background import BackgroundScheduler
+# Celery Configuration (Updated)
+app.config.update(
+    CELERY_BROKER_URL=app.config['REDIS_URL'],     
+    result_backend=app.config['REDIS_URL'] 
+)
 
 
+app.logger.info(f"initializing celery")
+celery = make_celery(app)
+socketio = SocketIO(app, message_queue=app.config['REDIS_URL'], async_mode='eventlet')
+celery.set_default()
 
-# Initialize the scheduler
-scheduler = BackgroundScheduler()
-
-def update_all_playlists_track_status():
-    """
-    Update track_count and tracks_available for all playlists in the database.
-    For each track, check if the file exists on the filesystem. If not, reset the downloaded flag and filesystem_path.
-    """
-    with app.app_context():
-        playlists = Playlist.query.all()
-
-        if not playlists:
-            app.logger.info("No playlists found.")
-            return
-
-        for playlist in playlists:
-            total_tracks = 0
-            available_tracks = 0
-
-            for track in playlist.tracks:
-                total_tracks += 1
-                
-                # Check if the file exists
-                if track.filesystem_path and os.path.exists(track.filesystem_path):
-                    available_tracks += 1
-                else:
-                    # If the file doesn't exist, reset the 'downloaded' flag and 'filesystem_path'
-                    track.downloaded = False
-                    track.filesystem_path = None
-                    db.session.commit()
-
-            # Update playlist fields
-            playlist.track_count = total_tracks
-            playlist.tracks_available = available_tracks
-
-            db.session.commit()
-
-        app.logger.info("All playlists' track statuses updated.")
-
-def download_missing_tracks():
-    app.logger.info("Starting track download job...")
-    with app.app_context():
-        # Get all tracks that are not downloaded
-        undownloaded_tracks = Track.query.filter_by(downloaded=False).all()
-
-        if not undownloaded_tracks:
-            app.logger.info("No undownloaded tracks found.")
-            return
-
-        for track in undownloaded_tracks:
-            app.logger.info(f"Trying to downloading track: {track.name} ({track.spotify_track_id})")
-
-            try:
-                # Download track using spotDL
-                s_url = f"https://open.spotify.com/track/{track.spotify_track_id}"
-                search = spotdl.search([s_url])
-                if search:
-                    song = search[0]
-                    dl_request = spotdl.download(song)
-                    # Assuming spotDL downloads files to the './downloads' directory, set the filesystem path
-                    file_path = dl_request[1].__str__()  # Adjust according to naming conventions
-
-                    if os.path.exists(file_path):
-                        # Update the track's downloaded status and filesystem path
-                        track.downloaded = True
-                        track.filesystem_path = file_path
-                        db.session.commit()
-
-                        app.logger.info(f"Track {track.name} downloaded successfully to {file_path}.")
-                    else:
-                        app.logger.error(f"Download failed for track {track.name}: file not found.")
-                else:
-                    app.logger.warning(f"{track.name} ({track.spotify_track_id}) not Found")
-
-            except Exception as e:
-                app.logger.error(f"Error downloading track {track.name}: {str(e)}")
-
-        app.logger.info("Track download job finished.")
-        update_all_playlists_track_status()
-
-def check_for_playlist_updates():
-    app.logger.info('Starting playlist update check...')
-    with app.app_context():
-        try:
-            playlists = Playlist.query.all()  # Get all users
-            for playlist in playlists:
-                app.logger.info(f'Checking updates for playlist: {playlist.name}')
-                try:
-                    # Fetch the latest data from the Spotify API
-                    playlist_data = sp.playlist(playlist.spotify_playlist_id)
-                    spotify_tracks = {track['track']['id']: track['track'] for track in playlist_data['tracks']['items']}
-                    existing_tracks = {track.spotify_track_id: track for track in playlist.tracks}
-
-                    # Tracks to add
-                    tracks_to_add = []
-                    for track_id, track_info in spotify_tracks.items():
-                        if track_id not in existing_tracks:
-                            track = Track.query.filter_by(spotify_track_id=track_id).first()
-                            if not track:
-                                track = Track(name=track_info['name'], spotify_track_id=track_id, spotify_uri=track_info['uri'],downloaded= False)
-                                db.session.add(track)
-                                db.session.commit()
-                                app.logger.info(f'Added new track: {track.name}')
-                            tracks_to_add.append(track)
-
-                    # Tracks to remove
-                    tracks_to_remove = [existing_tracks[track_id] for track_id in existing_tracks if track_id not in spotify_tracks]
-
-                    if tracks_to_add:
-                        for track in tracks_to_add:
-                            playlist.tracks.append(track)
-                        db.session.commit()
-                        app.logger.info(f'Added {len(tracks_to_add)} tracks to playlist: {playlist.name}')
-
-                    if tracks_to_remove:
-                        for track in tracks_to_remove:
-                            playlist.tracks.remove(track)
-                        db.session.commit()
-                        app.logger.info(f'Removed {len(tracks_to_remove)} tracks from playlist: {playlist.name}')
-
-                except Exception as e:
-                    app.logger.error(f"Error updating playlist {playlist.name}: {str(e)}")
-
-        except Exception as e:
-            app.logger.error(f"Error in check_for_playlist_updates: {str(e)}")
-
-    app.logger.info('Finished playlist update check.')
-    update_all_playlists_track_status()
-
-
-
-# Add the job to run every 10 minutes (customize the interval as needed)
-#scheduler.add_job(download_missing_tracks, 'interval', seconds=30, max_instances=1)
-#scheduler.add_job(check_for_playlist_updates, 'interval', minutes=10, max_instances=1)
-#download_missing_tracks()
-#check_for_playlist_updates()
-# Start the scheduler
-scheduler.start()
-
-# Ensure the scheduler shuts down properly when the app stops
-atexit.register(lambda: scheduler.shutdown())
+app.logger.info(f'Jellyplist {__version__} started')
+from app import routes
+from app import jellyfin_routes, tasks
+if "worker" in sys.argv:
+    tasks.release_lock("download_missing_tracks_lock")

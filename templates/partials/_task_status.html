@@ -1,0 +1,22 @@
+{% for task_name, task in tasks.items() %}
+<tr id="task-row-{{ task_name }}">
+    <td>{{ task_name }}</td>
+    <td>{{ task.state }}</td>
+    <td>
+        {% if task.info.percent %}
+        {{ task.info.percent }}%
+        {% else %}
+        N/A
+        {% endif %}
+    </td>
+    <td>
+        <div>
+
+            <button hx-post="/run_task/{{ task_name }}" hx-target="#task-row-{{ task_name }}" hx-swap="outerHTML"
+                class="btn btn-primary">
+                Run Task
+            </button>
+        </div>
+    </td>
+</tr>
+{% endfor %}
