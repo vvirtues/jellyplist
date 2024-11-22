@@ -108,7 +108,7 @@ def download_missing_tracks(self):
                     if search_before_download:
                         app.logger.info(f"Searching for track in Jellyfin: {track.name}")
                         # Retrieve the Spotify track and preview URL
-                        spotify_track = sp.track(track.spotify_track_id)
+                        spotify_track = functions.get_cached_spotify_track(track.spotify_track_id)
                         preview_url = spotify_track.get('preview_url')
                         if not preview_url:
                             app.logger.error(f"Preview URL not found for track {track.name}.")
@@ -342,7 +342,7 @@ def update_jellyfin_id_for_downloaded_tracks(self):
                                 break
                             elif not spotify_track:
                                 try:
-                                    spotify_track = sp.track(track.spotify_track_id)
+                                    spotify_track = functions.get_cached_spotify_track(track.spotify_track_id)
                                     spotify_track_name = spotify_track['name']
                                     spotify_artists = [artist['name'] for artist in spotify_track['artists']]
                                     spotify_album = spotify_track['album']['name']
