@@ -32,6 +32,7 @@ class Playlist(db.Model):
     jellyfin_id = db.Column(db.String(120), nullable=True)  
     last_updated = db.Column(db.DateTime )
     last_changed = db.Column(db.DateTime )
+    snapshot_id = db.Column(db.String(120), nullable=True)
     # Many-to-Many relationship with JellyfinUser
     users = db.relationship('JellyfinUser', secondary=user_playlists, back_populates='playlists')
 

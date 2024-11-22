@@ -203,14 +203,20 @@ def check_for_playlist_updates(self):
                 processed_playlists = 0
 
                 for playlist in playlists:
-                    app.logger.info(f'Checking updates for playlist: {playlist.name}')
                     playlist.last_updated = datetime.now( timezone.utc)
+                    sp_playlist = sp.playlist(playlist.spotify_playlist_id)
+                    
+                    app.logger.info(f'Checking updates for playlist: {playlist.name}, s_snapshot = {sp_playlist['snapshot_id']}')
                     db.session.commit()
+                    if sp_playlist['snapshot_id'] == playlist.snapshot_id:
+                        app.logger.info(f'playlist: {playlist.name} , no changes detected, snapshot_id {sp_playlist['snapshot_id']}')
+                        continue
                     try:
                         #region Check for updates
                         # Fetch all playlist data from Spotify
                         spotify_tracks = {}
                         offset = 0
+                        playlist.snapshot_id = sp_playlist['snapshot_id']
                         while True:
                             playlist_data = sp.playlist_items(playlist.spotify_playlist_id, offset=offset, limit=100)
                             items = playlist_data['items']
@@ -267,7 +273,7 @@ def check_for_playlist_updates(self):
                         #endregion
                         
                         #region Update Playlist Items and Metadata
-                        functions.update_playlist_metadata(playlist, sp.playlist(playlist.spotify_playlist_id))
+                        functions.update_playlist_metadata(playlist, sp_playlist)
                         ordered_tracks = db.session.execute(
                             db.select(Track, playlist_tracks.c.track_order)
                             .join(playlist_tracks, playlist_tracks.c.track_id == Track.id)
