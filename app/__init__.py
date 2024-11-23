@@ -111,8 +111,8 @@ cache = Cache(app)
 # Spotify, Jellyfin, and Spotdl setup
 app.logger.info(f"setting up spotipy")
 sp = spotipy.Spotify(auth_manager=SpotifyClientCredentials(
-    client_id=app.config['SPOTIPY_CLIENT_ID'],
-    client_secret=app.config['SPOTIPY_CLIENT_SECRET']
+    client_id=app.config['SPOTIFY_CLIENT_ID'],
+    client_secret=app.config['SPOTIFY_CLIENT_SECRET']
 ))
 
 app.logger.info(f"setting up jellyfin client")
