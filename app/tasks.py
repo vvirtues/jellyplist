@@ -78,8 +78,8 @@ def download_missing_tracks(self):
                 spotdl_config = app.config['SPOTDL_CONFIG']
                 cookie_file = spotdl_config['cookie_file']
                 output_dir = spotdl_config['output']
-                client_id = app.config['SPOTIPY_CLIENT_ID']
-                client_secret = app.config['SPOTIPY_CLIENT_SECRET']
+                client_id = app.config['SPOTIFY_CLIENT_ID']
+                client_secret = app.config['SPOTIFY_CLIENT_SECRET']
                 search_before_download = app.config['SEARCH_JELLYFIN_BEFORE_DOWNLOAD']
 
                 undownloaded_tracks = Track.query.filter_by(downloaded=False).all()

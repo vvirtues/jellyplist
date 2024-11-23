@@ -1,7 +1,7 @@
 ![Jellyplist Logo](./static/images/logo_large.png)
 
 > [!WARNING]  
-> Jellyplist is still at a very early stage: expect Bugs and weird behaviour 
+> Jellyplist is still at a very early stage: expect Bugs and weird behaviour. Especially the UI and UX are a bit clunky and unresponsive
 
 ## What is Jellyplist ? 
 Jellyplist aims to be a companion app for your self-hosted [Jellyfin](https://jellyfin.org/) Server. With Jellyplist you will be able to replicate/sync playlists from Spotify to your local Jellyfin account. Under the hood, it uses [SpotDL](https://spotdl.readthedocs.io/en/latest/) for downloading the corresponding tracks from the available sources if a track isn´t found in your local library.  
@@ -30,8 +30,8 @@ SECRET_KEY = Keykeykesykykesky  # Secret key for session management
 JELLYFIN_SERVER_URL = http://192.168.178.14:8096  # local Jellyfin server
 JELLYFIN_ADMIN_USER = admin # due to api limitations jellyplist uses user authentication rather than api tokens
 JELLYFIN_ADMIN_PASSWORD = admin_password_for_your_jellyifn_admin
-SPOTIPY_CLIENT_ID = <Client ID from Step 1>
-SPOTIPY_CLIENT_SECRET = <Secret from Step 1>
+SPOTIFY_CLIENT_ID = <Client ID from Step 1>
+SPOTIFY_CLIENT_SECRET = <Secret from Step 1>
 JELLYPLIST_DB_HOST = postgres-jellyplist #Hostname of the db Container
 JELLYPLIST_DB_USER = jellyplist
 JELLYPLIST_DB_PASSWORD = jellyplist
@@ -158,7 +158,25 @@ Jellyplist will cache requests where possible. Especially the `/tracks` endpoint
 
 
 - When logged in as admin, you will see the admin section in the sidebar. From there you can some kind of `batch linking`. All unlinked tracks will be displayed at once. 
-> [!TIP]
-> Linking of tracks had to be done only once. If a different playlist has the same track, Jellyplist will reuse the link
  ![Jellyplist batch link](./screenshots/batch_link.png)
 
+> [!TIP]
+> Linking of tracks had to be done only once. If a different playlist has the same track, Jellyplist will reuse the link
+
+
+#### After you added  your first playlist´s, the worker and scheduler will take over from this point. 
+The default schedules are:
+| **Schedule Name**                          | **Task**                                      | **Schedule**         |
+|--------------------------------------------|----------------------------------------------|----------------------|
+| `download-missing-tracks-schedule`         | `app.tasks.download_missing_tracks`          | Every day at minute 30 |
+| `check-playlist-updates-schedule`          | `app.tasks.check_for_playlist_updates`       | Every day at minute 25 |
+| `update_all_playlists_track_status-schedule`| `app.tasks.update_all_playlists_track_status`| Every 2 minutes       |
+| `update_jellyfin_id_for_downloaded_tracks-schedule` | `app.tasks.update_jellyfin_id_for_downloaded_tracks` | Every 10 minutes      |
+
+For now the schedules aren´t configurable, but this is subject to change.
+> [!TIP]
+> Please be patient after you added your first batch of playlists! Jellyplist currently processes one track at a time, and this means it can take some time for you to see the first results. 
+
+Then let Jellyplist do it´s work, after some time you should be able to see the playlist in Jellyfin. 
+
+Have Fun ✌🏽
