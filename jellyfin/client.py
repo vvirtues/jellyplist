@@ -5,13 +5,9 @@ import tempfile
 import numpy as np
 import requests
 import base64
-from urllib.parse import quote
 import acoustid
 import chromaprint
 import logging
-
-
-from app.routes import login
 from jellyfin.objects import PlaylistMetadata
 
 def _clean_query(query):
