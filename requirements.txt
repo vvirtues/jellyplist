@@ -17,4 +17,3 @@ psycopg2-binary
 eventlet
 pydub
 fuzzywuzzy
-lidarr-py @ git+https://github.com/devopsarr/lidarr-py.git
