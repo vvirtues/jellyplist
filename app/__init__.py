@@ -115,9 +115,9 @@ sp = spotipy.Spotify(auth_manager=SpotifyClientCredentials(
     client_secret=app.config['SPOTIFY_CLIENT_SECRET']
 ))
 
-app.logger.info(f"setting up jellyfin client")
+app.logger.info(f"setting up jellyfin client, BaseUrl = {app.config['JELLYFIN_SERVER_URL']}, timeout = {app.config['JELLYFIN_REQUEST_TIMEOUT']}")
 
-jellyfin = JellyfinClient(app.config['JELLYFIN_SERVER_URL'])
+jellyfin = JellyfinClient(app.config['JELLYFIN_SERVER_URL'], app.config['JELLYFIN_REQUEST_TIMEOUT'])
 jellyfin_admin_token, jellyfin_admin_id, jellyfin_admin_name, jellyfin_admin_is_admin = jellyfin.login_with_password(
     app.config['JELLYFIN_ADMIN_USER'],
     app.config['JELLYFIN_ADMIN_PASSWORD'], device_id= device_id

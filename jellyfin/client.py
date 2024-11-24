@@ -23,12 +23,13 @@ def _clean_query(query):
     return cleaned_query
 
 class JellyfinClient:
-    def __init__(self, base_url):
+    def __init__(self, base_url, timeout = 10):
         """
         Initialize the Jellyfin client with the base URL of the server.
         :param base_url: The base URL of the Jellyfin server (e.g., 'http://localhost:8096')
         """
         self.base_url = base_url
+        self.timeout = timeout
 
     def _get_headers(self, session_token: str):
         """
@@ -165,7 +166,7 @@ class JellyfinClient:
             'Fields': 'OpenAccess'              # Fields we want
         }
 
-        response = requests.get(playlists_url, headers=self._get_headers(session_token=session_token), params=params , timeout = 10)
+        response = requests.get(playlists_url, headers=self._get_headers(session_token=session_token), params=params , timeout = self.timeout)
         
         if response.status_code == 200:
             return response.json()['Items']
@@ -177,7 +178,7 @@ class JellyfinClient:
         params = {
             
         }
-        response = requests.get(url, headers=self._get_headers(session_token=session_token), params=params , timeout = 10)
+        response = requests.get(url, headers=self._get_headers(session_token=session_token), params=params , timeout = self.timeout)
         if response.status_code == 200:
             return response.json()
         else:
@@ -194,7 +195,7 @@ class JellyfinClient:
             "RegenerateTrickplay": "false",
             "ReplaceAllMetadata": "false"
         }
-        response = requests.post(url, headers=self._get_headers(session_token=session_token), params=params , timeout = 10)
+        response = requests.post(url, headers=self._get_headers(session_token=session_token), params=params , timeout = self.timeout)
         if response.status_code == 204:
             return True
         else:
@@ -374,7 +375,7 @@ class JellyfinClient:
         headers = self._get_headers(session_token=session_token)
         
         # Send the request to Jellyfin API
-        response = requests.post(url, headers=headers, json=data,timeout = 10)
+        response = requests.post(url, headers=headers, json=data,timeout = self.timeout)
 
         # Check for success
         if response.status_code == 204:
@@ -388,7 +389,7 @@ class JellyfinClient:
         
         """
         me_url = f'{self.base_url}/Users/Me'
-        response = requests.get(me_url, headers=self._get_headers(session_token=session_token), timeout = 10)
+        response = requests.get(me_url, headers=self._get_headers(session_token=session_token), timeout = self.timeout)
         
         if response.status_code == 200:
             return response.json()
