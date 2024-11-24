@@ -83,7 +83,7 @@ class JellyfinClient:
             'IsPublic' : False
         }
 
-        response = requests.post(create_url, json=data, headers=self._get_headers(session_token=session_token), timeout=10)
+        response = requests.post(create_url, json=data, headers=self._get_headers(session_token=session_token), timeout = self.timeout)
 
         if response.status_code == 200:
             return response.json()
@@ -102,7 +102,7 @@ class JellyfinClient:
             'Ids': ','.join(song_ids)  # Join song IDs with commas
         }
 
-        response = requests.post(update_url, json=data, headers=self._get_headers(session_token=session_token), timeout=10)
+        response = requests.post(update_url, json=data, headers=self._get_headers(session_token=session_token), timeout = self.timeout)
 
         if response.status_code == 204:  # 204 No Content indicates success for updating
             return {"status": "success", "message": "Playlist updated successfully"}
@@ -114,7 +114,7 @@ class JellyfinClient:
         params = {
             'UserId' : user_id
         }
-        response = requests.get(playlist_metadata_url, headers=self._get_headers(session_token=session_token), timeout=10, params = params)
+        response = requests.get(playlist_metadata_url, headers=self._get_headers(session_token=session_token), timeout = self.timeout, params = params)
         
         if response.status_code != 200:
             raise Exception(f"Failed to fetch playlist metadata: {response.content}")
@@ -146,7 +146,7 @@ class JellyfinClient:
         
         # Send the updated metadata to Jellyfin
         update_url = f'{self.base_url}/Items/{playlist_id}'
-        response = requests.post(update_url, json=metadata_obj.to_dict(), headers=self._get_headers(session_token= session_token), timeout=10, params = params)
+        response = requests.post(update_url, json=metadata_obj.to_dict(), headers=self._get_headers(session_token= session_token), timeout = self.timeout, params = params)
         
         if response.status_code == 204:
             return {"status": "success", "message": "Playlist metadata updated successfully"}
@@ -218,7 +218,7 @@ class JellyfinClient:
             'Fields': 'Name,Id,Album,Artists,Path'           # Retrieve the name and ID of the song
         }
 
-        response = requests.get(search_url, headers=self._get_headers(session_token=session_token), params=params, timeout=10)
+        response = requests.get(search_url, headers=self._get_headers(session_token=session_token), params=params, timeout = self.timeout)
         
         if response.status_code == 200:
             return response.json()['Items']
@@ -240,7 +240,7 @@ class JellyfinClient:
         }
 
         # Send the request to Jellyfin API with query parameters
-        response = requests.post(add_url, headers=self._get_headers(session_token=session_token), params=params, timeout=10)
+        response = requests.post(add_url, headers=self._get_headers(session_token=session_token), params=params, timeout = self.timeout)
 
         # Check for success
         if response.status_code == 204:  # 204 No Content indicates success
@@ -260,7 +260,7 @@ class JellyfinClient:
             'EntryIds': ','.join(song_ids)  # Join song IDs with commas
         }
 
-        response = requests.delete(remove_url, headers=self._get_headers(session_token=session_token), params=params, timeout=10)
+        response = requests.delete(remove_url, headers=self._get_headers(session_token=session_token), params=params, timeout = self.timeout)
 
         if response.status_code == 204:  # 204 No Content indicates success for updating
             return {"status": "success", "message": "Songs removed from playlist successfully"}
@@ -275,7 +275,7 @@ class JellyfinClient:
         """
         remove_url = f'{self.base_url}/Items/{playlist_id}'
 
-        response = requests.delete(remove_url, headers=self._get_headers(session_token=session_token), timeout=10)
+        response = requests.delete(remove_url, headers=self._get_headers(session_token=session_token), timeout = self.timeout)
 
         if response.status_code == 204:  # 204 No Content indicates successful deletion
             return {"status": "success", "message": "Playlist removed successfully"}
@@ -295,7 +295,7 @@ class JellyfinClient:
         url = f'{self.base_url}/Playlists/{playlist_id}/Users/{user_id}'
         
         # Send the DELETE request to remove the user from the playlist
-        response = requests.delete(url, headers=self._get_headers(session_token= session_token), timeout=10)
+        response = requests.delete(url, headers=self._get_headers(session_token= session_token), timeout = self.timeout)
         
         if response.status_code == 204:
             # 204 No Content indicates the user was successfully removed
@@ -315,7 +315,7 @@ class JellyfinClient:
         :return: Success message or raises an exception on failure.
         """
         # Step 1: Download the image from the Spotify URL
-        response = requests.get(spotify_image_url, timeout=10)
+        response = requests.get(spotify_image_url, timeout = self.timeout)
         
         if response.status_code != 200:
             raise Exception(f"Failed to download image from Spotify: {response.content}")
@@ -339,7 +339,7 @@ class JellyfinClient:
         upload_url = f'{self.base_url}/Items/{playlist_id}/Images/Primary'
         
         # Send the Base64-encoded image data
-        upload_response = requests.post(upload_url, headers=headers, data=image_base64, timeout=10)
+        upload_response = requests.post(upload_url, headers=headers, data=image_base64, timeout = self.timeout)
         
         if upload_response.status_code == 204:  # 204 No Content indicates success
             return {"status": "success", "message": "Playlist cover image updated successfully"}
@@ -399,7 +399,7 @@ class JellyfinClient:
     def get_playlist_users(self, session_token: str, playlist_id: str):
         url = f'{self.base_url}/Playlists/{playlist_id}/Users'
         
-        response = requests.get(url, headers=self._get_headers(session_token=session_token), timeout=10)
+        response = requests.get(url, headers=self._get_headers(session_token=session_token), timeout = self.timeout)
         
         if response.status_code != 200:
             raise Exception(f"Failed to fetch playlist metadata: {response.content}")
@@ -503,7 +503,7 @@ class JellyfinClient:
     # Helper methods used in search_track_in_jellyfin
     def download_preview_to_tempfile(self, preview_url):
         try:
-            response = requests.get(preview_url, timeout=10)
+            response = requests.get(preview_url, timeout = self.timeout)
             if response.status_code != 200:
                 return None
 
