@@ -8,7 +8,10 @@ import base64
 from urllib.parse import quote
 import acoustid
 import chromaprint
+import logging
 
+
+from app.routes import login
 from jellyfin.objects import PlaylistMetadata
 
 def _clean_query(query):
@@ -30,6 +33,9 @@ class JellyfinClient:
         """
         self.base_url = base_url
         self.timeout = timeout
+        self.logger = logging.getLogger(self.__class__.__name__)  # Logger named after the class
+        self.logger.setLevel(os.getenv('LOG_LEVEL', 'INFO').upper())
+        self.logger.debug(f"Initialized Jellyfin API Client. Base = '{self.base_url}', timeout = {timeout}")
 
     def _get_headers(self, session_token: str):
         """
@@ -47,7 +53,7 @@ class JellyfinClient:
         :param password: The password of the user.
         :return: Access token and user ID
         """
-        login_url = f'{self.base_url}/Users/AuthenticateByName'
+        url = f'{self.base_url}/Users/AuthenticateByName'
         headers = {
             'Content-Type': 'application/json',
             'X-Emby-Authorization': f'MediaBrowser Client="JellyPlist", Device="Web", DeviceId="{device_id}", Version="1.0"'
@@ -56,9 +62,10 @@ class JellyfinClient:
             'Username': username,
             'Pw': password
         }
-
-        response = requests.post(login_url, json=data, headers=headers)
-
+        self.logger.debug(f"Url={url}")
+        response = requests.post(url, json=data, headers=headers)
+        self.logger.debug(f"Response = {response.status_code}")
+        
         if response.status_code == 200:
             result = response.json()
             return result['AccessToken'], result['User']['Id'], result['User']['Name'],result['User']['Policy']['IsAdministrator']
@@ -74,7 +81,7 @@ class JellyfinClient:
         :param song_ids: A list of song IDs to include in the playlist.
         :return: The newly created playlist object
         """
-        create_url = f'{self.base_url}/Playlists'
+        url = f'{self.base_url}/Playlists'
         data = {
             'Name': name,
             'UserId': user_id,
@@ -82,8 +89,10 @@ class JellyfinClient:
             'Ids': ','.join(song_ids),  # Join song IDs with commas
             'IsPublic' : False
         }
+        self.logger.debug(f"Url={url}")
 
-        response = requests.post(create_url, json=data, headers=self._get_headers(session_token=session_token), timeout = self.timeout)
+        response = requests.post(url, json=data, headers=self._get_headers(session_token=session_token), timeout = self.timeout)
+        self.logger.debug(f"Response = {response.status_code}")
 
         if response.status_code == 200:
             return response.json()
@@ -97,12 +106,14 @@ class JellyfinClient:
         :param song_ids: A list of song IDs to include in the playlist.
         :return: The updated playlist object
         """
-        update_url = f'{self.base_url}/Playlists/{playlist_id}/Items'
+        url = f'{self.base_url}/Playlists/{playlist_id}/Items'
         data = {
             'Ids': ','.join(song_ids)  # Join song IDs with commas
         }
+        self.logger.debug(f"Url={url}")
 
-        response = requests.post(update_url, json=data, headers=self._get_headers(session_token=session_token), timeout = self.timeout)
+        response = requests.post(url, json=data, headers=self._get_headers(session_token=session_token), timeout = self.timeout)
+        self.logger.debug(f"Response = {response.status_code}")
 
         if response.status_code == 204:  # 204 No Content indicates success for updating
             return {"status": "success", "message": "Playlist updated successfully"}
@@ -110,11 +121,14 @@ class JellyfinClient:
             raise Exception(f"Failed to update playlist: {response.content}")
 
     def get_playlist_metadata(self, session_token: str, user_id: str,playlist_id: str) -> PlaylistMetadata:
-        playlist_metadata_url = f'{self.base_url}/Items/{playlist_id}'
+        url = f'{self.base_url}/Items/{playlist_id}'
         params = {
             'UserId' : user_id
         }
-        response = requests.get(playlist_metadata_url, headers=self._get_headers(session_token=session_token), timeout = self.timeout, params = params)
+        self.logger.debug(f"Url={url}")
+        
+        response = requests.get(url, headers=self._get_headers(session_token=session_token), timeout = self.timeout, params = params)
+        self.logger.debug(f"Response = {response.status_code}")
         
         if response.status_code != 200:
             raise Exception(f"Failed to fetch playlist metadata: {response.content}")
@@ -145,8 +159,11 @@ class JellyfinClient:
                 setattr(metadata_obj, key, value)
         
         # Send the updated metadata to Jellyfin
-        update_url = f'{self.base_url}/Items/{playlist_id}'
-        response = requests.post(update_url, json=metadata_obj.to_dict(), headers=self._get_headers(session_token= session_token), timeout = self.timeout, params = params)
+        url = f'{self.base_url}/Items/{playlist_id}'
+        self.logger.debug(f"Url={url}")
+        
+        response = requests.post(url, json=metadata_obj.to_dict(), headers=self._get_headers(session_token= session_token), timeout = self.timeout, params = params)
+        self.logger.debug(f"Response = {response.status_code}")
         
         if response.status_code == 204:
             return {"status": "success", "message": "Playlist metadata updated successfully"}
@@ -159,14 +176,17 @@ class JellyfinClient:
         Get all music playlists for the currently authenticated user.
         :return: A list of the user's music playlists
         """
-        playlists_url = f'{self.base_url}/Items'
+        url = f'{self.base_url}/Items'
         params = {
             'IncludeItemTypes': 'Playlist',  # Retrieve only playlists
             'Recursive': 'true',             # Include nested playlists
             'Fields': 'OpenAccess'              # Fields we want
         }
 
-        response = requests.get(playlists_url, headers=self._get_headers(session_token=session_token), params=params , timeout = self.timeout)
+        self.logger.debug(f"Url={url}")
+        
+        response = requests.get(url, headers=self._get_headers(session_token=session_token), params=params , timeout = self.timeout)
+        self.logger.debug(f"Response = {response.status_code}")
         
         if response.status_code == 200:
             return response.json()['Items']
@@ -178,7 +198,10 @@ class JellyfinClient:
         params = {
             
         }
+        self.logger.debug(f"Url={url}")
+        
         response = requests.get(url, headers=self._get_headers(session_token=session_token), params=params , timeout = self.timeout)
+        self.logger.debug(f"Response = {response.status_code}")
         if response.status_code == 200:
             return response.json()
         else:
@@ -195,7 +218,10 @@ class JellyfinClient:
             "RegenerateTrickplay": "false",
             "ReplaceAllMetadata": "false"
         }
+        self.logger.debug(f"Url={url}")
+        
         response = requests.post(url, headers=self._get_headers(session_token=session_token), params=params , timeout = self.timeout)
+        self.logger.debug(f"Response = {response.status_code}")
         if response.status_code == 204:
             return True
         else:
@@ -209,7 +235,7 @@ class JellyfinClient:
         :param search_query: The search term (title or song name).
         :return: A list of matching songs.
         """
-        search_url = f'{self.base_url}/Items'
+        url = f'{self.base_url}/Items'
         params = {
             'SearchTerm': search_query.replace('\'',"´").replace('’','´'),
             
@@ -217,8 +243,11 @@ class JellyfinClient:
             'Recursive': 'true',          # Search within all folders
             'Fields': 'Name,Id,Album,Artists,Path'           # Retrieve the name and ID of the song
         }
+        self.logger.debug(f"Url={url}")
+        
 
-        response = requests.get(search_url, headers=self._get_headers(session_token=session_token), params=params, timeout = self.timeout)
+        response = requests.get(url, headers=self._get_headers(session_token=session_token), params=params, timeout = self.timeout)
+        self.logger.debug(f"Response = {response.status_code}")
         
         if response.status_code == 200:
             return response.json()['Items']
@@ -233,14 +262,17 @@ class JellyfinClient:
         :return: A success message.
         """
         # Construct the API URL with query parameters
-        add_url = f'{self.base_url}/Playlists/{playlist_id}/Items'
+        url = f'{self.base_url}/Playlists/{playlist_id}/Items'
         params = {
             'ids': ','.join(song_ids),  # Comma-separated song IDs
             'userId': user_id
         }
 
+        self.logger.debug(f"Url={url}")
+        
         # Send the request to Jellyfin API with query parameters
-        response = requests.post(add_url, headers=self._get_headers(session_token=session_token), params=params, timeout = self.timeout)
+        response = requests.post(url, headers=self._get_headers(session_token=session_token), params=params, timeout = self.timeout)
+        self.logger.debug(f"Response = {response.status_code}")
 
         # Check for success
         if response.status_code == 204:  # 204 No Content indicates success
@@ -255,12 +287,14 @@ class JellyfinClient:
         :param song_ids: A list of song IDs to remove.
         :return: A success message.
         """
-        remove_url = f'{self.base_url}/Playlists/{playlist_id}/Items'
+        url = f'{self.base_url}/Playlists/{playlist_id}/Items'
         params = {
             'EntryIds': ','.join(song_ids)  # Join song IDs with commas
         }
-
-        response = requests.delete(remove_url, headers=self._get_headers(session_token=session_token), params=params, timeout = self.timeout)
+        self.logger.debug(f"Url={url}")
+        
+        response = requests.delete(url, headers=self._get_headers(session_token=session_token), params=params, timeout = self.timeout)
+        self.logger.debug(f"Response = {response.status_code}")
 
         if response.status_code == 204:  # 204 No Content indicates success for updating
             return {"status": "success", "message": "Songs removed from playlist successfully"}
@@ -273,9 +307,11 @@ class JellyfinClient:
         :param playlist_id: The ID of the playlist to remove.
         :return: A success message upon successful deletion.
         """
-        remove_url = f'{self.base_url}/Items/{playlist_id}'
-
-        response = requests.delete(remove_url, headers=self._get_headers(session_token=session_token), timeout = self.timeout)
+        url = f'{self.base_url}/Items/{playlist_id}'
+        self.logger.debug(f"Url={url}")
+        
+        response = requests.delete(url, headers=self._get_headers(session_token=session_token), timeout = self.timeout)
+        self.logger.debug(f"Response = {response.status_code}")
 
         if response.status_code == 204:  # 204 No Content indicates successful deletion
             return {"status": "success", "message": "Playlist removed successfully"}
@@ -293,9 +329,11 @@ class JellyfinClient:
         """
         # Construct the API endpoint URL
         url = f'{self.base_url}/Playlists/{playlist_id}/Users/{user_id}'
+        self.logger.debug(f"Url={url}")
         
         # Send the DELETE request to remove the user from the playlist
         response = requests.delete(url, headers=self._get_headers(session_token= session_token), timeout = self.timeout)
+        self.logger.debug(f"Response = {response.status_code}")
         
         if response.status_code == 204:
             # 204 No Content indicates the user was successfully removed
@@ -335,11 +373,13 @@ class JellyfinClient:
         headers['Content-Type'] = content_type  # Set to the correct image type
         headers['Accept'] = '*/*'
 
-        # Step 5: Upload the Base64-encoded image to Jellyfin as a plain string in the request body
-        upload_url = f'{self.base_url}/Items/{playlist_id}/Images/Primary'
+        # url 5: Upload the Base64-encoded image to Jellyfin as a plain string in the request body
+        url = f'{self.base_url}/Items/{playlist_id}/Images/Primary'
+        self.logger.debug(f"Url={url}")
         
         # Send the Base64-encoded image data
-        upload_response = requests.post(upload_url, headers=headers, data=image_base64, timeout = self.timeout)
+        upload_response = requests.post(url, headers=headers, data=image_base64, timeout = self.timeout)
+        self.logger.debug(f"Response = {response.status_code}")
         
         if upload_response.status_code == 204:  # 204 No Content indicates success
             return {"status": "success", "message": "Playlist cover image updated successfully"}
@@ -418,20 +458,30 @@ class JellyfinClient:
         """
         try:
             # Download the Spotify preview audio
+            
+
+            self.logger.debug(f"Downloading preview  {preview_url} to tmp file")
             tmp = self.download_preview_to_tempfile(preview_url=preview_url)
             if tmp is None:
+                self.logger.error(f"Downloading preview  {preview_url} to tmp file failed, not continuing")
                 return False, None
 
             # Convert the preview file to a normalized WAV file
+            self.logger.debug(f"Converting preview to WAV file")
+            
             tmp_wav = self.convert_to_wav(tmp)
             if tmp_wav is None:
+                self.logger.error(f"Converting preview to WAV failed, not continuing")
                 os.remove(tmp)
                 return False, None
 
             # Fingerprint the normalized preview WAV file
+            self.logger.debug(f"Performing fingerprinting on preview {tmp_wav}")
+
             _, tmp_fp = acoustid.fingerprint_file(tmp_wav)
             tmp_fp_dec, version = chromaprint.decode_fingerprint(tmp_fp)
             tmp_fp_dec = np.array(tmp_fp_dec, dtype=np.uint32)
+            self.logger.debug(f"decoded fingerprint for preview: {tmp_fp_dec}")
 
             # Search for matching tracks in Jellyfin using only the song name
             search_query = song_name  # Only use the song name in the search query
@@ -529,12 +579,14 @@ class JellyfinClient:
             ]
             result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             if result.returncode != 0:
+                self.logger.error(f"Error converting to WAV, subprocess exitcode: {result.returncode}")
+                
                 os.remove(output_file.name)
                 return None
 
             return output_file.name
         except Exception as e:
-            print(f"Error converting to WAV: {str(e)}")
+            self.logger.error(f"Error converting to WAV: {str(e)}")
             return None
 
     def sliding_fingerprint_similarity(self, full_fp, preview_fp):
