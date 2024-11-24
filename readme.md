@@ -37,6 +37,11 @@ SPOTIFY_CLIENT_SECRET = <Secret from Step 1>
 JELLYPLIST_DB_HOST = postgres-jellyplist #Hostname of the db Container
 JELLYPLIST_DB_USER = jellyplist
 JELLYPLIST_DB_PASSWORD = jellyplist
+# Optional: 
+# SEARCH_JELLYFIN_BEFORE_DOWNLOAD = false # defaults to true, before attempting to do a download with spotDL , the song will be searched first in the local library
+# START_DOWNLOAD_AFTER_PLAYLIST_ADD = false # defaults to true, If a new Playlist is added, the Download Task will be scheduled immediately
+# 
+
 ```
 
 4. Prepare a `docker-compose.yml`
