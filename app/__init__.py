@@ -103,7 +103,8 @@ app = Flask(__name__, template_folder="../templates", static_folder='../static')
 # app.logger.addHandler(stream_handler)
 
 app.config.from_object(Config)
-app.logger.setLevel(logging.DEBUG)
+log_level = getattr(logging, app.config['LOG_LEVEL'], logging.INFO)  # Default to DEBUG if invalid
+app.logger.setLevel(log_level)
 Config.validate_env_vars()
 cache = Cache(app)
 

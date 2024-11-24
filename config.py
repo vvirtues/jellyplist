@@ -3,6 +3,7 @@ import sys
 
 
 class Config:
+    LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO').upper()
     SECRET_KEY = os.getenv('SECRET_KEY')  
     JELLYFIN_SERVER_URL = os.getenv('JELLYFIN_SERVER_URL')  
     JELLYFIN_ADMIN_USER = os.getenv('JELLYFIN_ADMIN_USER')
@@ -28,6 +29,7 @@ class Config:
         'output': '/jellyplist_downloads/__jellyplist/{track-id}',
         'threads': 12
     }
+    
     @classmethod
     def validate_env_vars(cls):
         required_vars = {
