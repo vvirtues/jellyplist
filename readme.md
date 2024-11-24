@@ -14,6 +14,8 @@ It´s definitely not a general Playlist Manager for Jellyfin.
 - **View Monitored Playlists**: View playlists which are already synced by the server, adding these to your Jellyfin account will make them available immediately
 - **Search Playlist**: Search for playlists
 - **No Sign-Up or User-Accounts**: Jellyplist uses your local Jellyfin server for authentication
+- **Automatically keep track of changes**: Changes in order, added or removed songs will be tracked and synced with Jellyfin.
+- **Metadata Sync**: Playlist Metadata will be available at your Jellyfin Server
 
 ## Getting Started
 
