@@ -181,6 +181,11 @@ def download_missing_tracks(self):
                 }
         finally:
             release_lock(lock_key)
+            if app.config['REFRESH_LIBRARIES_AFTER_DOWNLOAD_TASK']:
+                libraries = jellyfin.get_libraries(jellyfin_admin_token)
+                for lib in libraries:
+                    if lib['CollectionType'] == 'music':
+                        jellyfin.refresh_library(jellyfin_admin_token, lib['ItemId'])
     else:
         app.logger.info("Skipping task. Another instance is already running.")
         return {'status': 'Task skipped, another instance is running'}

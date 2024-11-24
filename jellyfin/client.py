@@ -172,8 +172,36 @@ class JellyfinClient:
         else:
             raise Exception(f"Failed to get playlists: {response.content}")
 
-    
-    
+    def get_libraries(self, session_token: str):
+        url = f'{self.base_url}/Library/VirtualFolders'
+        params = {
+            
+        }
+        response = requests.get(url, headers=self._get_headers(session_token=session_token), params=params , timeout = 10)
+        if response.status_code == 200:
+            return response.json()
+        else:
+            raise Exception(f"Failed to get playlists: {response.content}")
+        
+    def refresh_library(self, session_token: str, library_id: str) -> bool:
+        url = f'{self.base_url}/Items/{library_id}/Refresh'
+        
+        params = {
+            "Recursive": "true",
+            "ImageRefreshMode": "Default",
+            "MetadataRefreshMode": "Default",
+            "ReplaceAllImages": "false",
+            "RegenerateTrickplay": "false",
+            "ReplaceAllMetadata": "false"
+        }
+        response = requests.post(url, headers=self._get_headers(session_token=session_token), params=params , timeout = 10)
+        if response.status_code == 204:
+            return True
+        else:
+            raise Exception(f"Failed to update library: {response.content}")
+
+
+
     def search_music_tracks(self, session_token: str, search_query: str):
         """
         Search for music tracks by title, song name, and optionally Spotify-ID.
