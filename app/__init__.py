@@ -151,7 +151,7 @@ def read_dev_build_file(file_path="/jellyplist/DEV_BUILD"):
             content = file.read().strip()
             return f"-{content}"
     else:
-        return None
+        return ''
 app.logger.info(f"initializing celery")
 celery = make_celery(app)
 socketio = SocketIO(app, message_queue=app.config['REDIS_URL'], async_mode='eventlet')
