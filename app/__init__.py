@@ -83,8 +83,6 @@ def make_celery(app):
     celery.conf.timezone = 'UTC'
     return celery
 
-log_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s : %(message)s')
-
 # Why this ? Because we are using the same admin login for web, worker and beat we need to distinguish the device_id´s
 device_id = f'JellyPlist_{'_'.join(sys.argv)}'
 
@@ -102,9 +100,17 @@ app = Flask(__name__, template_folder="../templates", static_folder='../static')
 # # app.logger.addHandler(handler)
 # app.logger.addHandler(stream_handler)
 
+
 app.config.from_object(Config)
+for handler in app.logger.handlers:
+    app.logger.removeHandler(handler)
+
 log_level = getattr(logging, app.config['LOG_LEVEL'], logging.INFO)  # Default to DEBUG if invalid
 app.logger.setLevel(log_level)
+
+FORMAT = "[%(asctime)s][%(filename)18s:%(lineno)4s - %(funcName)20s() ]  %(message)s" 
+logging.basicConfig(format=FORMAT)
+
 Config.validate_env_vars()
 cache = Cache(app)
 
@@ -152,6 +158,7 @@ socketio = SocketIO(app, message_queue=app.config['REDIS_URL'], async_mode='even
 celery.set_default()
 
 app.logger.info(f'Jellyplist {__version__}{read_dev_build_file()} started')
+app.logger.debug(f"Debug logging active")
 from app import routes
 from app import jellyfin_routes, tasks
 if "worker" in sys.argv:

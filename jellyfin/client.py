@@ -29,8 +29,10 @@ class JellyfinClient:
         """
         self.base_url = base_url
         self.timeout = timeout
-        self.logger = logging.getLogger(self.__class__.__name__)  # Logger named after the class
+        self.logger = logging.getLogger(self.__class__.__name__)
         self.logger.setLevel(os.getenv('LOG_LEVEL', 'INFO').upper())
+        FORMAT = "[%(asctime)s][%(filename)18s:%(lineno)4s - %(funcName)20s() ]  %(message)s" 
+        logging.basicConfig(format=FORMAT)
         self.logger.debug(f"Initialized Jellyfin API Client. Base = '{self.base_url}', timeout = {timeout}")
 
     def _get_headers(self, session_token: str):
