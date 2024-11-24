@@ -139,13 +139,19 @@ app.config.update(
     result_backend=app.config['REDIS_URL'] 
 )
 
-
+def read_dev_build_file(file_path="/jellyplist/DEV_BUILD"):
+    if os.path.exists(file_path):
+        with open(file_path, "r") as file:
+            content = file.read().strip()
+            return f"-{content}"
+    else:
+        return None
 app.logger.info(f"initializing celery")
 celery = make_celery(app)
 socketio = SocketIO(app, message_queue=app.config['REDIS_URL'], async_mode='eventlet')
 celery.set_default()
 
-app.logger.info(f'Jellyplist {__version__} started')
+app.logger.info(f'Jellyplist {__version__}{read_dev_build_file()} started')
 from app import routes
 from app import jellyfin_routes, tasks
 if "worker" in sys.argv:

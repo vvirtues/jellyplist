@@ -1,5 +1,5 @@
 from flask import Flask, Response, jsonify, render_template, request, redirect, url_for, session, flash
-from app import app, db, functions, sp, jellyfin, celery, jellyfin_admin_token, jellyfin_admin_id,device_id,  cache
+from app import app, db, functions, sp, jellyfin, celery, jellyfin_admin_token, jellyfin_admin_id,device_id,  cache, read_dev_build_file
 from app.models import JellyfinUser,Playlist,Track
 from celery.result import AsyncResult
 from .version import __version__
@@ -7,7 +7,7 @@ from .version import __version__
 @app.context_processor
 def add_context():
     unlinked_track_count = len(Track.query.filter_by(downloaded=True,jellyfin_id=None).all())
-    version = f"v{__version__}"
+    version = f"v{__version__}{read_dev_build_file()}"
     return dict(unlinked_track_count = unlinked_track_count, version = version)
 
 @app.after_request
