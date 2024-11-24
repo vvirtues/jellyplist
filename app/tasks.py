@@ -138,14 +138,17 @@ def download_missing_tracks(self):
                     try:
                         app.logger.info(f"Trying to download track: {track.name} ({track.spotify_track_id}), spotdl timeout = 90")
                         s_url = f"https://open.spotify.com/track/{track.spotify_track_id}"
-
+                        
                         command = [
                             "spotdl", "download", s_url,
                             "--output", output_dir,
-                            "--cookie-file", cookie_file,
                             "--client-id", client_id,
                             "--client-secret", client_secret
                         ]
+                        if os.path.exists(cookie_file):
+                            app.logger.debug(f"Found {cookie_file}, using it for spotDL")
+                            command.append("--cookie-file")
+                            command.append(cookie_file)
 
                         result = subprocess.run(command, capture_output=True, text=True, timeout=90)
                         if result.returncode == 0 and os.path.exists(file_path):
