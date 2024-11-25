@@ -1,7 +1,7 @@
 import time
 from flask import Flask, jsonify, render_template, request, redirect, url_for, session, flash
 from sqlalchemy import insert
-from app import app, db,  jellyfin, functions, device_id
+from app import app, db,  jellyfin, functions, device_id,sp
 from app.models import Playlist,Track,  playlist_tracks
 
 
@@ -76,9 +76,18 @@ def add_playlist():
         user = functions._get_logged_in_user()
         playlist.tracks_available = 0
         
-        # Add tracks to the playlist with track order
-        for idx, track_data in enumerate(playlist_data['tracks']['items']):
-            track_info = track_data['track']
+        spotify_tracks = {}
+        offset = 0
+        while True:
+            playlist_items = sp.playlist_items(playlist.spotify_playlist_id, offset=offset, limit=100)
+            items = playlist_items['items']
+            spotify_tracks.update({offset + idx: track['track'] for idx, track in enumerate(items) if track['track']})
+            
+            if len(items) < 100:  # No more tracks to fetch
+                break
+            offset += 100  # Move to the next batch
+        for idx, track_data in spotify_tracks.items():
+            track_info = track_data
             if not track_info:
                 continue
             track = Track.query.filter_by(spotify_track_id=track_info['id']).first()
@@ -127,6 +136,7 @@ def add_playlist():
 
     except Exception as e:
         flash(str(e))
+        return ''
      
 
 @app.route('/delete_playlist/<playlist_id>', methods=['DELETE'])
@@ -154,7 +164,33 @@ def delete_playlist(playlist_id):
         flash(f'Failed to remove item: {str(e)}')
     
 
-
+@app.route('/wipe_playlist/<playlist_id>', methods=['DELETE'])
+@functions.jellyfin_admin_required
+def wipe_playlist(playlist_id):
+    playlist = Playlist.query.filter_by(jellyfin_id=playlist_id).first()
+    name = ""
+    id = ""
+    jf_id = ""
+    try:
+        jellyfin.remove_item(session_token=functions._get_api_token(), playlist_id=playlist_id)
+    except Exception as e:
+        flash(f"Jellyfin API Error: {str(e)}")
+    if playlist:
+        # Delete the playlist
+        name = playlist.name
+        id = playlist.spotify_playlist_id
+        jf_id = playlist.jellyfin_id
+        db.session.delete(playlist)
+        db.session.commit()
+        flash('Playlist Deleted', category='info')
+    item = {
+        "name" : name,
+        "id" : id,
+        "can_add":True,
+        "can_remove":False,
+        "jellyfin_id" : jf_id
+    }
+    return render_template('partials/_add_remove_button.html',item= item)
 
 @functions.jellyfin_login_required
 @app.route('/get_jellyfin_stream/<string:jellyfin_id>')
