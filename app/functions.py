@@ -5,6 +5,7 @@ from functools import  wraps
 from celery.result import AsyncResult
 from app.tasks import download_missing_tracks,check_for_playlist_updates, update_all_playlists_track_status, update_jellyfin_id_for_downloaded_tracks
 from jellyfin.objects import PlaylistMetadata
+import re
 
 TASK_STATUS = {
     'update_all_playlists_track_status': None,
@@ -36,6 +37,9 @@ def manage_task(task_name):
 def prepPlaylistData(data):
     playlists = []
     jellyfin_user = JellyfinUser.query.filter_by(jellyfin_user_id=session['jellyfin_user_id']).first()
+    if not jellyfin_user:
+        app.logger.error(f"jellyfin_user not set: session user id: {session['jellyfin_user_id']}. Logout and Login again")
+        return None
     if not data.get('playlists'):
         
         data['playlists']= {}
@@ -293,3 +297,11 @@ def _get_logged_in_user():
 def _get_admin_id():
     #return JellyfinUser.query.filter_by(is_admin=True).first().jellyfin_user_id
     return jellyfin_admin_id
+
+
+def get_longest_substring(input_string):
+    special_chars = ["'", "’", "‘", "‛", "`", "´", "‘"]
+    pattern = "[" + re.escape("".join(special_chars)) + "]"
+    substrings = re.split(pattern, input_string)
+    longest_substring = max(substrings, key=len, default="")
+    return longest_substring
