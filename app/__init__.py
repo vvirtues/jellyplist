@@ -70,7 +70,7 @@ def make_celery(app):
         },
         'update_all_playlists_track_status-schedule': {
             'task': 'app.tasks.update_all_playlists_track_status',
-            'schedule': crontab(minute='*/2'),  
+            'schedule': crontab(minute='*/5'),  
             
         },
         'update_jellyfin_id_for_downloaded_tracks-schedule': {
