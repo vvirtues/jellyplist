@@ -108,7 +108,7 @@ for handler in app.logger.handlers:
 log_level = getattr(logging, app.config['LOG_LEVEL'], logging.INFO)  # Default to DEBUG if invalid
 app.logger.setLevel(log_level)
 
-FORMAT = "[%(asctime)s][%(filename)18s:%(lineno)4s - %(funcName)20s() ]  %(message)s" 
+FORMAT = "[%(asctime)s][%(filename)18s:%(lineno)4s - %(funcName)20s() ] %(levelname)7s - %(message)s" 
 logging.basicConfig(format=FORMAT)
 
 Config.validate_env_vars()
@@ -131,9 +131,10 @@ jellyfin_admin_token, jellyfin_admin_id, jellyfin_admin_name, jellyfin_admin_is_
 )
 
 # SQLAlchemy and Migrate setup
-app.logger.info(f"connecting to db: {app.config['JELLYPLIST_DB_HOST']}")
-check_db_connection(f'postgresql://{app.config["JELLYPLIST_DB_USER"]}:{app.config["JELLYPLIST_DB_PASSWORD"]}@{app.config["JELLYPLIST_DB_HOST"]}/jellyplist',retries=5,delay=2)
-app.config['SQLALCHEMY_DATABASE_URI'] = f'postgresql://{app.config['JELLYPLIST_DB_USER']}:{app.config['JELLYPLIST_DB_PASSWORD']}@{app.config['JELLYPLIST_DB_HOST']}/jellyplist'
+app.logger.info(f"connecting to db: {app.config['JELLYPLIST_DB_HOST']}:{app.config['JELLYPLIST_DB_PORT']}")
+db_uri = f'postgresql://{app.config["JELLYPLIST_DB_USER"]}:{app.config["JELLYPLIST_DB_PASSWORD"]}@{app.config["JELLYPLIST_DB_HOST"]}:{app.config['JELLYPLIST_DB_PORT']}/jellyplist'
+check_db_connection(db_uri=db_uri,retries=5,delay=2)
+app.config['SQLALCHEMY_DATABASE_URI'] = db_uri
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 app.logger.info(f"applying db migrations")

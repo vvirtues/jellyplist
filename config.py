@@ -12,6 +12,7 @@ class Config:
     SPOTIFY_CLIENT_ID = os.getenv('SPOTIFY_CLIENT_ID')
     SPOTIFY_CLIENT_SECRET = os.getenv('SPOTIFY_CLIENT_SECRET')
     JELLYPLIST_DB_HOST = os.getenv('JELLYPLIST_DB_HOST')
+    JELLYPLIST_DB_PORT = int(os.getenv('JELLYPLIST_DB_PORT','5432'))
     JELLYPLIST_DB_USER = os.getenv('JELLYPLIST_DB_USER')
     JELLYPLIST_DB_PASSWORD = os.getenv('JELLYPLIST_DB_PASSWORD')
     START_DOWNLOAD_AFTER_PLAYLIST_ADD  = os.getenv('START_DOWNLOAD_AFTER_PLAYLIST_ADD',"true").lower() == 'true' # If a new Playlist is added, the Download Task will be scheduled immediately
