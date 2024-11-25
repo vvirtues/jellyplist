@@ -31,7 +31,7 @@ class JellyfinClient:
         self.timeout = timeout
         self.logger = logging.getLogger(self.__class__.__name__)
         self.logger.setLevel(os.getenv('LOG_LEVEL', 'INFO').upper())
-        FORMAT = "[%(asctime)s][%(filename)18s:%(lineno)4s - %(funcName)20s() ]  %(message)s" 
+        FORMAT = "[%(asctime)s][%(filename)18s:%(lineno)4s - %(funcName)23s() ] %(levelname)7s - %(message)s"  
         logging.basicConfig(format=FORMAT)
         self.logger.debug(f"Initialized Jellyfin API Client. Base = '{self.base_url}', timeout = {timeout}")
 
@@ -479,7 +479,7 @@ class JellyfinClient:
             _, tmp_fp = acoustid.fingerprint_file(tmp_wav)
             tmp_fp_dec, version = chromaprint.decode_fingerprint(tmp_fp)
             tmp_fp_dec = np.array(tmp_fp_dec, dtype=np.uint32)
-            self.logger.debug(f"decoded fingerprint for preview: {tmp_fp_dec}")
+            self.logger.debug(f"decoded fingerprint for preview: {tmp_fp_dec[:5]}")
 
             # Search for matching tracks in Jellyfin using only the song name
             search_query = song_name  # Only use the song name in the search query
@@ -575,9 +575,11 @@ class JellyfinClient:
                 "-acodec", "pcm_s16le", "-ar", "44100",
                 "-ac", "2", output_file.name
             ]
-            result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            result = subprocess.run(command, capture_output=True, text=True)
             if result.returncode != 0:
-                self.logger.error(f"Error converting to WAV, subprocess exitcode: {result.returncode}")
+                self.logger.error(f"Error converting to WAV, subprocess exitcode: {result.returncode} , input_file_path = {input_file_path}")
+                self.logger.error(f"\tprocess stdout: {result.stdout}")
+                self.logger.error(f"\tprocess stderr: {result.stderr}")
                 
                 os.remove(output_file.name)
                 return None
