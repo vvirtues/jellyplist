@@ -123,7 +123,8 @@ def download_missing_tracks(self):
                             if track.filesystem_path != best_match['Path']:
                                 track.filesystem_path = best_match['Path']
                             
-                            db.session.commit()        
+                            db.session.commit()     
+                            processed_tracks+=1   
                             continue                
                         
                         # region search with fingerprinting                        
