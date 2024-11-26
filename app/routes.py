@@ -1,5 +1,5 @@
 from flask import Flask, Response, jsonify, render_template, request, redirect, url_for, session, flash
-from app import app, db, functions, sp, jellyfin, celery, jellyfin_admin_token, jellyfin_admin_id,device_id,  cache, read_dev_build_file
+from app import app, db, functions, sp, jellyfin, celery, jellyfin_admin_token, jellyfin_admin_id,device_id,  cache, read_dev_build_file, tasks
 from app.models import JellyfinUser,Playlist,Track
 from celery.result import AsyncResult
 from .version import __version__
@@ -10,12 +10,16 @@ def add_context():
     version = f"v{__version__}{read_dev_build_file()}"
     return dict(unlinked_track_count = unlinked_track_count, version = version)
 
+
+# this feels wrong 
+skip_endpoints = ['task_status']
 @app.after_request
 def render_messages(response: Response) -> Response:
     if request.headers.get("HX-Request"):
-        messages = render_template("partials/alerts.jinja2")
-        response.headers['HX-Trigger'] = 'showToastMessages'
-        response.data = response.data + messages.encode("utf-8")
+        if request.endpoint not in skip_endpoints:
+            messages = render_template("partials/alerts.jinja2")
+            response.headers['HX-Trigger'] = 'showToastMessages'
+            response.data = response.data + messages.encode("utf-8")
     return response
 
 
@@ -31,7 +35,7 @@ def task_manager():
         else:
             statuses[task_name] = {'state': 'NOT STARTED', 'info': {}}
     
-    return render_template('admin/tasks.html', tasks=statuses)
+    return render_template('admin/tasks.html', tasks=statuses,lock_keys  = functions.LOCK_KEYS)
 
 @app.route('/admin')
 @app.route('/admin/link_issues')
@@ -261,6 +265,17 @@ def associate_track():
         flash(str(e))
         return ''
         
+
+@app.route("/unlock_key",methods = ['POST'])
+@functions.jellyfin_admin_required
+def unlock_key():
+     
+    key_name = request.form.get('inputLockKey')
+    if key_name:
+        tasks.release_lock(key_name)
+        flash(f'Lock {key_name} released', category='success')
+    return ''
+
 
 @app.route('/test')
 def test():
