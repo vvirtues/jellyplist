@@ -39,7 +39,7 @@ JELLYPLIST_DB_USER = jellyplist
 JELLYPLIST_DB_PASSWORD = jellyplist
 # Optional: 
 # SEARCH_JELLYFIN_BEFORE_DOWNLOAD = false # defaults to true, before attempting to do a download with spotDL , the song will be searched first in the local library
-# START_DOWNLOAD_AFTER_PLAYLIST_ADD = false # defaults to true, If a new Playlist is added, the Download Task will be scheduled immediately
+# START_DOWNLOAD_AFTER_PLAYLIST_ADD = true # defaults to false, If a new Playlist is added, the Download Task will be scheduled immediately
 # 
 
 ```
@@ -130,6 +130,7 @@ volumes:
 7. Launch your browser `http://<container_addr>:5055` 
 
 ## Technical Details/FAQ
+
 
 - _Why have I to provide a Jellyfin Admin and Password instead of a API Token ?_
 
