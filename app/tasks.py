@@ -53,6 +53,8 @@ def update_all_playlists_track_status(self):
                         total_tracks += 1
                         if track.filesystem_path and os.path.exists(track.filesystem_path):
                             available_tracks += 1
+                            track.downloaded = True
+                            
                         else:
                             track.downloaded = False
                             track.filesystem_path = None
@@ -378,6 +380,9 @@ def update_jellyfin_id_for_downloaded_tracks(self):
                                 app.logger.info(f"Updated Jellyfin ID for track: {track.name} ({track.spotify_track_id})")
                             if track.filesystem_path != best_match['Path']:
                                 track.filesystem_path = best_match['Path']
+                                app.logger.info(f"Updated filesystem_path for track: {track.name} ({track.spotify_track_id})")
+                                
+                                
                             
                             db.session.commit()
                         else:
@@ -411,6 +416,8 @@ def find_best_match_from_jellyfin(track: Track):
         
 
         for result in search_results:
+            quality_score = compute_quality_score(result, app.config['FIND_BEST_MATCH_USE_FFPROBE'])
+            
             if len(search_results) == 1:
                 app.logger.debug(f"Only 1 search_result, assuming best match: {result['Id']} ({app.config['JELLYFIN_SERVER_URL']}/web/#/details?id={result['Id']})")
                 best_match = result
@@ -435,7 +442,6 @@ def find_best_match_from_jellyfin(track: Track):
             jellyfin_artists = [artist.lower() for artist in result.get('Artists', [])]
             if (spotify_track_name.lower() == jellyfin_track_name and
                 set(artist.lower() for artist in spotify_artists) == set(jellyfin_artists)):
-                quality_score = compute_quality_score(result, app.config['FIND_BEST_MATCH_USE_FFPROBE'])
                 app.logger.debug(f"Quality score for track {result['Name']}: {quality_score} [{result['Path']}]")
                 
                 if quality_score > best_quality_score:
@@ -447,7 +453,7 @@ def find_best_match_from_jellyfin(track: Track):
         app.logger.error(f"Error searching Jellyfin for track {track.name}: {str(e)}")
         return None
 
-def compute_quality_score(result, use_ffprobe=False):
+def compute_quality_score(result, use_ffprobe=False) -> float:
     """
     Compute a quality score for a track based on its metadata or detailed analysis using ffprobe.
     """
