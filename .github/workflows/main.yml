@@ -59,7 +59,7 @@ jobs:
       - name: Generate Auto Release Notes
         id: release_notes
         run: |
-          auto_notes=$(gh release create ${{ env.VERSION }} --generate-notes --prerelease --dry-run --json body --jq .body)
+          auto_notes=$(gh release create ${{ env.VERSION }} --generate-notes --prerelease --json body --jq .body)
           echo "AUTO_RELEASE_NOTES<<EOF" >> $GITHUB_ENV
           echo "$auto_notes" >> $GITHUB_ENV
           echo "EOF" >> $GITHUB_ENV
