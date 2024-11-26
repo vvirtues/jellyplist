@@ -84,3 +84,13 @@ function playJellyfinTrack(button, jellyfinId) {
     })
     .catch(error => console.error('Error fetching Jellyfin stream URL:', error));
 }
+
+function handleJellyfinClick(event, jellyfinId, trackTitle, spotifyId) {
+  if (event.ctrlKey) {
+      // CTRL key is pressed, open the search modal
+      openSearchModal(trackTitle, spotifyId);
+  } else {
+      // CTRL key is not pressed, play the track
+      playJellyfinTrack(event.target, jellyfinId);
+  }
+}

@@ -47,13 +47,14 @@
           {% endif %}
         </td>
         <td>
+          {% set title = track.title | replace("'","") %}
+
           {% if track.jellyfin_id %}
-          <button class="btn btn-sm btn-success" onclick="playJellyfinTrack(this, '{{ track.jellyfin_id }}')" data-bs-toggle="tooltip" title="Play from Jellyfin">
+          <button class="btn btn-sm btn-success" onclick="handleJellyfinClick(event, '{{ track.jellyfin_id }}', '{{ title }}', '{{ track.spotify_id }}')" data-bs-toggle="tooltip" title="Play from Jellyfin (Hold CTRL Key to reassing a new track)">
             <i class="fas fa-play"></i>
           </button>
           {% elif track.downloaded %}
           <span data-bs-toggle="tooltip" title="Track Downloaded, but not in Jellyfin or could not be associated automatically. You can try to do the association manually">
-          {% set title = track.title | replace("'","") %}
             <button class="btn btn-sm btn-warning" onclick="openSearchModal('{{ title  }}','{{track.spotify_id}}')">
               <i class="fas fa-triangle-exclamation"></i>
             </button>
