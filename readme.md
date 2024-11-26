@@ -14,6 +14,8 @@ It´s definitely not a general Playlist Manager for Jellyfin.
 - **View Monitored Playlists**: View playlists which are already synced by the server, adding these to your Jellyfin account will make them available immediately
 - **Search Playlist**: Search for playlists
 - **No Sign-Up or User-Accounts**: Jellyplist uses your local Jellyfin server for authentication
+- **Automatically keep track of changes**: Changes in order, added or removed songs will be tracked and synced with Jellyfin.
+- **Metadata Sync**: Playlist Metadata will be available at your Jellyfin Server
 
 ## Getting Started
 
@@ -35,6 +37,11 @@ SPOTIFY_CLIENT_SECRET = <Secret from Step 1>
 JELLYPLIST_DB_HOST = postgres-jellyplist #Hostname of the db Container
 JELLYPLIST_DB_USER = jellyplist
 JELLYPLIST_DB_PASSWORD = jellyplist
+# Optional: 
+# SEARCH_JELLYFIN_BEFORE_DOWNLOAD = false # defaults to true, before attempting to do a download with spotDL , the song will be searched first in the local library
+# START_DOWNLOAD_AFTER_PLAYLIST_ADD = true # defaults to false, If a new Playlist is added, the Download Task will be scheduled immediately
+# 
+
 ```
 
 4. Prepare a `docker-compose.yml`
@@ -123,6 +130,7 @@ volumes:
 7. Launch your browser `http://<container_addr>:5055` 
 
 ## Technical Details/FAQ
+
 
 - _Why have I to provide a Jellyfin Admin and Password instead of a API Token ?_
 

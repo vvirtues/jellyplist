@@ -42,12 +42,38 @@ jobs:
             ghcr.io/${{ github.repository }}:${{ env.VERSION }}
             ghcr.io/${{ github.repository }}:latest
 
+      # Read changelog for the current version
+      - name: Read Changelog
+        id: changelog
+        run: |
+          if [ -f changelogs/${{ env.VERSION }}.md ]; then
+            changelog_content=$(cat changelogs/${{ env.VERSION }}.md)
+            echo "CHANGELOG_CONTENT<<EOF" >> $GITHUB_ENV
+            echo "$changelog_content" >> $GITHUB_ENV
+            echo "EOF" >> $GITHUB_ENV
+          else
+            echo "CHANGELOG_CONTENT=No changelog available for this release." >> $GITHUB_ENV
+          fi
+
+      # Generate auto-generated release notes
+      - name: Generate Auto Release Notes
+        id: release_notes
+        run: |
+          auto_notes=$(gh release create ${{ env.VERSION }} --generate-notes --prerelease --dry-run --json body --jq .body)
+          echo "AUTO_RELEASE_NOTES<<EOF" >> $GITHUB_ENV
+          echo "$auto_notes" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+
       # Create a release on GitHub
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ env.VERSION }}
           name: Release ${{ env.VERSION }}
-          generate_release_notes: true
+          body: |
+            ${{ env.CHANGELOG_CONTENT }}
+
+            ## Auto-Generated Release Notes
+            ${{ env.AUTO_RELEASE_NOTES }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

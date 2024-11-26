@@ -70,7 +70,7 @@ def make_celery(app):
         },
         'update_all_playlists_track_status-schedule': {
             'task': 'app.tasks.update_all_playlists_track_status',
-            'schedule': crontab(minute='*/2'),  
+            'schedule': crontab(minute='*/5'),  
             
         },
         'update_jellyfin_id_for_downloaded_tracks-schedule': {
@@ -82,8 +82,6 @@ def make_celery(app):
     
     celery.conf.timezone = 'UTC'
     return celery
-
-log_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s : %(message)s')
 
 # Why this ? Because we are using the same admin login for web, worker and beat we need to distinguish the device_id´s
 device_id = f'JellyPlist_{'_'.join(sys.argv)}'
@@ -102,8 +100,17 @@ app = Flask(__name__, template_folder="../templates", static_folder='../static')
 # # app.logger.addHandler(handler)
 # app.logger.addHandler(stream_handler)
 
+
 app.config.from_object(Config)
-app.logger.setLevel(logging.DEBUG)
+for handler in app.logger.handlers:
+    app.logger.removeHandler(handler)
+
+log_level = getattr(logging, app.config['LOG_LEVEL'], logging.INFO)  # Default to DEBUG if invalid
+app.logger.setLevel(log_level)
+
+FORMAT = "[%(asctime)s][%(filename)18s:%(lineno)4s - %(funcName)20s() ] %(levelname)7s - %(message)s" 
+logging.basicConfig(format=FORMAT)
+
 Config.validate_env_vars()
 cache = Cache(app)
 
@@ -115,18 +122,19 @@ sp = spotipy.Spotify(auth_manager=SpotifyClientCredentials(
     client_secret=app.config['SPOTIFY_CLIENT_SECRET']
 ))
 
-app.logger.info(f"setting up jellyfin client")
+app.logger.info(f"setting up jellyfin client, BaseUrl = {app.config['JELLYFIN_SERVER_URL']}, timeout = {app.config['JELLYFIN_REQUEST_TIMEOUT']}")
 
-jellyfin = JellyfinClient(app.config['JELLYFIN_SERVER_URL'])
+jellyfin = JellyfinClient(app.config['JELLYFIN_SERVER_URL'], app.config['JELLYFIN_REQUEST_TIMEOUT'])
 jellyfin_admin_token, jellyfin_admin_id, jellyfin_admin_name, jellyfin_admin_is_admin = jellyfin.login_with_password(
     app.config['JELLYFIN_ADMIN_USER'],
     app.config['JELLYFIN_ADMIN_PASSWORD'], device_id= device_id
 )
 
 # SQLAlchemy and Migrate setup
-app.logger.info(f"connecting to db: {app.config['JELLYPLIST_DB_HOST']}")
-check_db_connection(f'postgresql://{app.config["JELLYPLIST_DB_USER"]}:{app.config["JELLYPLIST_DB_PASSWORD"]}@{app.config["JELLYPLIST_DB_HOST"]}/jellyplist',retries=5,delay=2)
-app.config['SQLALCHEMY_DATABASE_URI'] = f'postgresql://{app.config['JELLYPLIST_DB_USER']}:{app.config['JELLYPLIST_DB_PASSWORD']}@{app.config['JELLYPLIST_DB_HOST']}/jellyplist'
+app.logger.info(f"connecting to db: {app.config['JELLYPLIST_DB_HOST']}:{app.config['JELLYPLIST_DB_PORT']}")
+db_uri = f'postgresql://{app.config["JELLYPLIST_DB_USER"]}:{app.config["JELLYPLIST_DB_PASSWORD"]}@{app.config["JELLYPLIST_DB_HOST"]}:{app.config['JELLYPLIST_DB_PORT']}/jellyplist'
+check_db_connection(db_uri=db_uri,retries=5,delay=2)
+app.config['SQLALCHEMY_DATABASE_URI'] = db_uri
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 app.logger.info(f"applying db migrations")
@@ -138,13 +146,20 @@ app.config.update(
     result_backend=app.config['REDIS_URL'] 
 )
 
-
+def read_dev_build_file(file_path="/jellyplist/DEV_BUILD"):
+    if os.path.exists(file_path):
+        with open(file_path, "r") as file:
+            content = file.read().strip()
+            return f"-{content}"
+    else:
+        return ''
 app.logger.info(f"initializing celery")
 celery = make_celery(app)
 socketio = SocketIO(app, message_queue=app.config['REDIS_URL'], async_mode='eventlet')
 celery.set_default()
 
-app.logger.info(f'Jellyplist {__version__} started')
+app.logger.info(f'Jellyplist {__version__}{read_dev_build_file()} started')
+app.logger.debug(f"Debug logging active")
 from app import routes
 from app import jellyfin_routes, tasks
 if "worker" in sys.argv:

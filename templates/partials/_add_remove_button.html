@@ -4,9 +4,18 @@
   hx-vals='{"item_id": "{{ item.id }}", "item_name": "{{ item.name }}"}'>
   <i class="fa-solid fa-circle-plus"> </i>
 </button>
+
 {% elif item.can_remove %}
-<button class="btn btn-warning" hx-delete="{{ url_for('delete_playlist', playlist_id=item['jellyfin_id']) }}"
+<span id="item-can-remove-{{ item.id }}" >
+  <button class="btn btn-warning" hx-delete="{{ url_for('delete_playlist', playlist_id=item['jellyfin_id']) }}" 
   hx-include="this" hx-swap="outerHTML" hx-target="this" data-bs-toggle="tooltip" title="Remove from Jellyfin">
   <i class="fa-solid fa-circle-minus"> </i>
 </button>
 {% endif %}
+{% if session['is_admin'] and item.can_remove %}
+<button class="btn btn-danger " hx-delete="{{ url_for('wipe_playlist', playlist_id=item['jellyfin_id']) }}"
+hx-include="this" hx-swap="outerHTML" hx-target="#item-can-remove-{{ item.id }}" data-bs-toggle="tooltip" title="Delete playlist from monitoring and remove (DELETE FOR ALL USERS) from Jellyfin">
+<i class="fa-solid fa-trash"> </i>
+</button>
+</span>
+{% endif%}
