@@ -13,6 +13,14 @@ TASK_STATUS = {
     'check_for_playlist_updates': None,
     'update_jellyfin_id_for_downloaded_tracks' : None
 }
+LOCK_KEYS = [
+    'update_all_playlists_track_status_lock',    
+    'download_missing_tracks_lock',
+    'check_for_playlist_updates_lock',
+    'update_jellyfin_id_for_downloaded_tracks_lock' ,
+    'full_update_jellyfin_ids' 
+
+]
 
 def manage_task(task_name):
     task_id = TASK_STATUS.get(task_name)
