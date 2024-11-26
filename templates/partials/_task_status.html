@@ -4,16 +4,27 @@
     <td>{{ task.state }}</td>
     <td>
         {% if task.info.percent %}
-        {{ task.info.percent }}%
+        <div class="progress" style="height: 20px;">
+            <div 
+                class="progress-bar {% if task.info.percent|round(0) == 100 %}bg-success{% else %}bg-primary{% endif %}" 
+                role="progressbar" 
+                style="width: {{ task.info.percent|round(2) }}%;" 
+                aria-valuenow="{{ task.info.percent|round(2) }}" 
+                aria-valuemin="0" 
+                aria-valuemax="100">
+                {{ task.info.percent|round(2) }}%
+            </div>
+        </div>
         {% else %}
-        N/A
+        <span class="text-muted">N/A</span>
         {% endif %}
     </td>
     <td>
         <div>
-
-            <button hx-post="/run_task/{{ task_name }}" hx-target="#task-row-{{ task_name }}" hx-swap="outerHTML"
-                class="btn btn-primary">
+            <button hx-post="/run_task/{{ task_name }}" 
+                    hx-target="#task-row-{{ task_name }}" 
+                    hx-swap="outerHTML"
+                    class="btn btn-primary">
                 Run Task
             </button>
         </div>
