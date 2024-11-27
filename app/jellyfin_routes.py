@@ -208,5 +208,5 @@ def search_jellyfin():
     if search_query:
         results = jellyfin.search_music_tracks(functions._get_token_from_sessioncookie(), search_query)
         # Render only the search results section as response
-        return render_template('partials/_jf_search_results.html', results=results,spotify_id=  spotify_id)
+        return render_template('partials/_jf_search_results.html', results=results,spotify_id=  spotify_id,search_query = search_query)
     return jsonify({'error': 'No search query provided'}), 400

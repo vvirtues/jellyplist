@@ -17,6 +17,7 @@ class Config:
     JELLYPLIST_DB_PASSWORD = os.getenv('JELLYPLIST_DB_PASSWORD')
     START_DOWNLOAD_AFTER_PLAYLIST_ADD  = os.getenv('START_DOWNLOAD_AFTER_PLAYLIST_ADD',"false").lower() == 'true' # If a new Playlist is added, the Download Task will be scheduled immediately
     REFRESH_LIBRARIES_AFTER_DOWNLOAD_TASK  = os.getenv('REFRESH_LIBRARIES_AFTER_DOWNLOAD_TASK',"false").lower() == 'true' 
+    DISPLAY_EXTENDED_AUDIO_DATA = os.getenv('DISPLAY_EXTENDED_AUDIO_DATA',"false").lower() == 'true' 
     CACHE_TYPE = 'redis'
     CACHE_REDIS_PORT = 6379
     CACHE_REDIS_HOST = 'redis'

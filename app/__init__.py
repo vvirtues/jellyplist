@@ -164,3 +164,9 @@ from app import routes
 from app import jellyfin_routes, tasks
 if "worker" in sys.argv:
     tasks.release_lock("download_missing_tracks_lock")
+    
+from app import filters  # Import the filters dictionary
+
+# Register all filters
+for name, func in filters.filters.items():
+    app.jinja_env.filters[name] = func

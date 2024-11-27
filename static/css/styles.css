@@ -53,3 +53,8 @@ body {
 .logo img{
     width: 100%;
 }
+@media screen and (min-width: 1600px) {
+    .modal-dialog {
+      max-width: 90%; /* New width for default modal */
+    }
+}
