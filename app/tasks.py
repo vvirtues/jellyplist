@@ -5,6 +5,7 @@ import subprocess
 from sqlalchemy import insert
 from app import celery, app, db, functions, sp, jellyfin, jellyfin_admin_token, jellyfin_admin_id
 
+from app.classes import AudioProfile
 from app.models import JellyfinUser,Playlist,Track, user_playlists, playlist_tracks
 import os
 import redis
@@ -481,44 +482,10 @@ def compute_quality_score(result, use_ffprobe=False) -> float:
     if use_ffprobe:
         path = result.get('Path')
         if path:
-            ffprobe_score = analyze_audio_quality_with_ffprobe(path)
+            profile = AudioProfile.analyze_audio_quality_with_ffprobe(path)
+            ffprobe_score = profile.compute_quality_score()
             score += ffprobe_score
         else:
             app.logger.warning(f"No valid file path for track {result.get('Name')} - Skipping ffprobe analysis.")
     
     return score
-
-def analyze_audio_quality_with_ffprobe(filepath):
-    """
-    Use ffprobe to extract quality attributes from an audio file and compute a score.
-    """
-    try:
-        # ffprobe command to extract bitrate, sample rate, and channel count
-        cmd = [
-            'ffprobe', '-v', 'error', '-select_streams', 'a:0',
-            '-show_entries', 'stream=bit_rate,sample_rate,channels',
-            '-show_format',
-            '-of', 'json', filepath
-        ]
-        result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-        if result.returncode != 0:
-            app.logger.error(f"ffprobe error for file {filepath}: {result.stderr}")
-            return 0
-        
-        # Parse ffprobe output
-        import json
-        data = json.loads(result.stdout)
-        stream = data.get('streams', [{}])[0]
-        bitrate = int(stream.get('bit_rate', 0)) // 1000  # Convert to kbps
-        if bitrate == 0:
-            bitrate = int(data.get('format')['bit_rate']) // 1000
-        sample_rate = int(stream.get('sample_rate', 0))  # Hz
-        
-        channels = int(stream.get('channels', 0))
-
-        # Compute score based on extracted quality parameters
-        score = bitrate + (sample_rate // 1000) + (channels * 10)  # Example scoring formula
-        return score
-    except Exception as e:
-        app.logger.error(f"Error analyzing audio quality with ffprobe: {str(e)}")
-        return 0
