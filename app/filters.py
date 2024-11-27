@@ -14,10 +14,17 @@ def template_filter(name):
     return decorator
 
 @template_filter('highlight')
-def highlight_search(text, search_query):
+def highlight_search(text: str, search_query: str) -> Markup:
     if not search_query:
         return text
+    
     search_query_escaped = re.escape(search_query)
+
+    # If the text matches the search query exactly, apply a different highlight
+    if text.strip().lower() == search_query.strip().lower():
+        return Markup(f'<mark style="background-color: lightgreen; color: black;">{text}</mark>')
+    
+    # Highlight partial matches in the text
     highlighted_text = re.sub(
         f"({search_query_escaped})",
         r'<mark>\1</mark>',
