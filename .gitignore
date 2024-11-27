@@ -76,3 +76,4 @@ coverage/
 cookies*.txt
 *.code-workspace
 set_env.sh
+notes.md
