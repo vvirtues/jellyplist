@@ -8,7 +8,7 @@ from .version import __version__
 def add_context():
     unlinked_track_count = len(Track.query.filter_by(downloaded=True,jellyfin_id=None).all())
     version = f"v{__version__}{read_dev_build_file()}"
-    return dict(unlinked_track_count = unlinked_track_count, version = version)
+    return dict(unlinked_track_count = unlinked_track_count, version = version, config = app.config)
 
 
 # this feels wrong 
@@ -135,7 +135,7 @@ def logout():
 @app.route('/playlists/monitored')
 @functions.jellyfin_login_required
 def loaditems():
-    country = 'DE'
+    country = app.config['SPOTIFY_COUNTRY_CODE']
     offset = int(request.args.get('offset', 0))  # Get the offset (default to 0 for initial load)
     limit = 20  # Define a limit for pagination
     additional_query = ''

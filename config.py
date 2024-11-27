@@ -26,6 +26,7 @@ class Config:
     REDIS_URL = os.getenv('REDIS_URL','redis://redis:6379/0')
     SEARCH_JELLYFIN_BEFORE_DOWNLOAD = os.getenv('SEARCH_JELLYFIN_BEFORE_DOWNLOAD',"true").lower() == 'true'
     FIND_BEST_MATCH_USE_FFPROBE = os.getenv('FIND_BEST_MATCH_USE_FFPROBE','false').lower() == 'true'
+    SPOTIFY_COUNTRY_CODE = os.getenv('SPOTIFY_COUNTRY_CODE','DE')
     # SpotDL specific configuration
     SPOTDL_CONFIG = {
         'cookie_file': '/jellyplist/cookies.txt',
