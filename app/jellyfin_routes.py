@@ -3,7 +3,7 @@ from flask import Flask, jsonify, render_template, request, redirect, url_for, s
 from sqlalchemy import insert
 from app import app, db,  jellyfin, functions, device_id,sp
 from app.models import Playlist,Track,  playlist_tracks
-
+from spotipy.exceptions import SpotifyException
 
 
 from jellyfin.objects import PlaylistMetadata
@@ -38,11 +38,15 @@ def jellyfin_playlists():
         prepared_data = functions.prepPlaylistData(spotify_data)
         
         return render_template('jellyfin_playlists.html', playlists=prepared_data)
-    
+    except SpotifyException as e:
+            app.logger.error(f"Error fetching monitored playlists: {e}")
+            error_data, error_message = e, f'Could not retrieve monitored Playlists. Please try again later. This is most likely due to an Error in the Spotify API or an rate limit has been reached.'
+            return render_template('jellyfin_playlists.html', playlists=functions.prepPlaylistData({'playlists': {'items': []}}), error_message=error_message,error_data = error_data)
+            
     except Exception as e:
         app.logger.error(f"Error in /jellyfin_playlists route: {str(e)}")
         flash('An error occurred while fetching playlists.', 'danger')
-        return render_template('jellyfin_playlists.html', playlists=functions.prepPlaylistData({'playlists': {'items': []}}))
+        return render_template('jellyfin_playlists.html', playlists=functions.prepPlaylistData({'playlists': {'items': []}}), error_message='An error occurred while fetching playlists.',error_data = e)
     
 
 @app.route('/addplaylist', methods=['POST'])

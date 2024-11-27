@@ -5,6 +5,8 @@ from functools import  wraps
 from celery.result import AsyncResult
 from app.tasks import download_missing_tracks,check_for_playlist_updates, update_all_playlists_track_status, update_jellyfin_id_for_downloaded_tracks
 from jellyfin.objects import PlaylistMetadata
+from spotipy.exceptions import SpotifyException
+
 import re
 
 TASK_STATUS = {
@@ -129,12 +131,9 @@ def get_cached_spotify_playlist(playlist_id):
     :param playlist_id: The Spotify playlist ID.
     :return: Playlist data as a dictionary, or None if an error occurs.
     """
-    try:
-        playlist_data = sp.playlist(playlist_id)  # Fetch data from Spotify API
-        return playlist_data
-    except Exception as e:
-        app.logger.error(f"Error fetching playlist {playlist_id} from Spotify: {str(e)}")
-        return None
+    playlist_data = sp.playlist(playlist_id)  # Fetch data from Spotify API
+    return playlist_data
+
 @cache.memoize(timeout=3600*24*10)  
 def get_cached_spotify_track(track_id):
     """
@@ -180,15 +179,21 @@ def prepArtistData(data):
 
 
 
-def getFeaturedPlaylists(country,offset):
-    playlists_data = sp.featured_playlists(country=country, limit=16, offset=offset)
-    
-    return prepPlaylistData(playlists_data), playlists_data['playlists']['total'],'Featured Playlists'
+def getFeaturedPlaylists(country: str, offset: int):
+    try:
+        playlists_data = sp.featured_playlists(country=country, limit=16, offset=offset)
+        return prepPlaylistData(playlists_data), playlists_data['playlists']['total'], 'Featured Playlists'
+    except SpotifyException as e:
+        app.logger.error(f"Spotify API error in getFeaturedPlaylists: {e}")
+        return [], e, f'Error: Could not load featured playlists. Please try again later. This is most likely due to an Error in the Spotify API or an rate limit has been reached.'
 
-def getCategoryPlaylists(category,offset):
-    playlists_data = sp.category_playlists(category_id=category, limit=16, offset=offset)
-    
-    return prepPlaylistData(playlists_data), playlists_data['playlists']['total'],f"Category {playlists_data['message']}"
+def getCategoryPlaylists(category: str, offset: int):
+    try:
+        playlists_data = sp.category_playlists(category_id=category, limit=16, offset=offset)
+        return prepPlaylistData(playlists_data), playlists_data['playlists']['total'], f"Category {playlists_data['message']}"
+    except SpotifyException as e:
+        app.logger.error(f"Spotify API error in getCategoryPlaylists: {e}")
+        return [], e, 'Error: Could not load category playlists. Please try again later. This is most likely due to an Error in the Spotify API or an rate limit has been reached.'
 
 def getCategories(country,offset):
     categories_data = sp.categories(limit=16, offset= offset)

@@ -3,6 +3,7 @@ from app import app, db, functions, sp, jellyfin, celery, jellyfin_admin_token, 
 from app.models import JellyfinUser,Playlist,Track
 from celery.result import AsyncResult
 from .version import __version__
+from spotipy.exceptions import SpotifyException
 
 @app.context_processor
 def add_context():
@@ -140,32 +141,46 @@ def loaditems():
     limit = 20  # Define a limit for pagination
     additional_query = ''
     items_subtitle = ''
-
+    error_message = None  # Placeholder for error messages
+    error_data = ''
     if request.path == '/playlists/monitored':
-        # Step 1: Query the database for monitored playlists
-        db_playlists = db.session.query(Playlist).offset(offset).limit(limit).all()
-        max_items = db.session.query(Playlist).count()
-        
-        # Collect Spotify Playlist IDs from the database
-        spotify_playlist_ids = [playlist.spotify_playlist_id for playlist in db_playlists]
-      
-        spotify_data = functions.get_cached_spotify_playlists(tuple(spotify_playlist_ids))
-
-        # Step 3: Pass the Spotify data to prepPlaylistData for processing
-        data = functions.prepPlaylistData(spotify_data)
-        items_title = "Monitored Playlists"
-        items_subtitle = "This playlists are already monitored by the Server, if you add one of these to your Jellyfin account, they will be available immediately."
+        try:
+            db_playlists = db.session.query(Playlist).offset(offset).limit(limit).all()
+            max_items = db.session.query(Playlist).count()
+            spotify_playlist_ids = [playlist.spotify_playlist_id for playlist in db_playlists]
+            spotify_data = functions.get_cached_spotify_playlists(tuple(spotify_playlist_ids))
+            data = functions.prepPlaylistData(spotify_data)
+            items_title = "Monitored Playlists"
+            items_subtitle = "These playlists are already monitored by the Server. If you add one to your Jellyfin account, they will be available immediately."
+        except SpotifyException as e:
+            app.logger.error(f"Error fetching monitored playlists: {e}")
+            data, max_items, items_title = [], e, f'Could not retrieve monitored Playlists. Please try again later. This is most likely due to an Error in the Spotify API or an rate limit has been reached.'
+            error_message = items_title
+            error_data = max_items
 
     elif request.path == '/playlists':
         cat = request.args.get('cat', None)
         if cat is not None:
             data, max_items, items_title = functions.getCategoryPlaylists(category=cat, offset=offset)
+            if not data:  # Check if data is empty
+                error_message = items_title  # Set the error message from the function
+                error_data = max_items
             additional_query += f"&cat={cat}"
         else:
             data, max_items, items_title = functions.getFeaturedPlaylists(country=country, offset=offset)
+            if not data:  # Check if data is empty
+                error_message = items_title  # Set the error message from the function
+                error_data = max_items
 
     elif request.path == '/categories':
-        data, max_items, items_title = functions.getCategories(country=country, offset=offset)
+        try:
+            data, max_items, items_title = functions.getCategories(country=country, offset=offset)
+        except Exception as e:
+            app.logger.error(f"Error fetching categories: {e}")
+            data, max_items, items_title = [], e, f'Error: Could not load categories. Please try again later. '
+            error_message = items_title
+            error_data = max_items
+            
 
     next_offset = offset + len(data)
     total_items = max_items
@@ -175,8 +190,10 @@ def loaditems():
         'total_items': total_items,
         'endpoint': request.path,
         'items_title': items_title,
-        'items_subtitle' : items_subtitle,
-        'additional_query': additional_query
+        'items_subtitle': items_subtitle,
+        'additional_query': additional_query,
+        'error_message': error_message,  # Pass error message to the template
+        'error_data': error_data,  # Pass error message to the template
     }
 
     if request.headers.get('HX-Request'):  # Check if the request is from HTMX

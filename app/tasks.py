@@ -127,31 +127,34 @@ def download_missing_tracks(self):
                             processed_tracks+=1   
                             continue                
                         
-                        # region search with fingerprinting                        
-                        preview_url = spotify_track.get('preview_url')
-                        if not preview_url:
-                            app.logger.error(f"Preview URL not found for track {track.name}.")
-                            # Decide whether to skip or proceed to download
-                            # For now, we'll proceed to download
-                        else:
-                            # Get the list of Spotify artist names
-                            spotify_artists = [artist['name'] for artist in spotify_track['artists']]
-
-                            # Perform the search in Jellyfin
-                            match_found, jellyfin_file_path = jellyfin.search_track_in_jellyfin(
-                                session_token=jellyfin_admin_token,
-                                preview_url=preview_url,
-                                song_name=track.name,
-                                artist_names=spotify_artists
-                            )
-                            if match_found:
-                                app.logger.info(f"Match found in Jellyfin for track {track.name}. Skipping download.")
-                                track.downloaded = True
-                                track.filesystem_path = jellyfin_file_path
-                                db.session.commit()
-                                continue
+                        # region search with fingerprinting   
+                        if spotify_track:                     
+                            preview_url = spotify_track.get('preview_url')
+                            if not preview_url:
+                                app.logger.error(f"Preview URL not found for track {track.name}.")
+                                # Decide whether to skip or proceed to download
+                                # For now, we'll proceed to download
                             else:
-                                app.logger.info(f"No match found in Jellyfin for track {track.name}. Proceeding to download.")
+                                # Get the list of Spotify artist names
+                                spotify_artists = [artist['name'] for artist in spotify_track['artists']]
+
+                                # Perform the search in Jellyfin
+                                match_found, jellyfin_file_path = jellyfin.search_track_in_jellyfin(
+                                    session_token=jellyfin_admin_token,
+                                    preview_url=preview_url,
+                                    song_name=track.name,
+                                    artist_names=spotify_artists
+                                )
+                                if match_found:
+                                    app.logger.info(f"Match found in Jellyfin for track {track.name}. Skipping download.")
+                                    track.downloaded = True
+                                    track.filesystem_path = jellyfin_file_path
+                                    db.session.commit()
+                                    continue
+                                else:
+                                    app.logger.info(f"No match found in Jellyfin for track {track.name}. Proceeding to download.")
+                        else:
+                            app.logger.warning(f"spotify_track not set, see previous log messages")
                         #endregion
                                 
                     #endregion 
