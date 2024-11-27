@@ -400,7 +400,7 @@ def update_jellyfin_id_for_downloaded_tracks(self):
 
                     processed_tracks += 1
                     progress = (processed_tracks / total_tracks) * 100
-                    self.update_state(state='PROGRESS', meta={'current': processed_tracks, 'total': total_tracks, 'percent': progress})
+                    self.update_state(state=f'{processed_tracks}/{total_tracks}: {track.name}', meta={'current': processed_tracks, 'total': total_tracks, 'percent': progress})
 
                 app.logger.info("Finished updating Jellyfin IDs for all tracks.")
                 return {'status': 'All tracks updated', 'total': total_tracks, 'processed': processed_tracks}
@@ -421,37 +421,43 @@ def find_best_match_from_jellyfin(track: Track):
         
 
         for result in search_results:
+            
+            app.logger.debug(f"Processing search result: {result['Id']}")
             quality_score = compute_quality_score(result, app.config['FIND_BEST_MATCH_USE_FFPROBE'])
-            
-            if len(search_results) == 1:
-                app.logger.debug(f"Only 1 search_result, assuming best match: {result['Id']} ({app.config['JELLYFIN_SERVER_URL']}/web/#/details?id={result['Id']})")
-                best_match = result
-                break
-            
-            jellyfin_path = result.get('Path', '')
-            # if jellyfin_path == track.filesystem_path:
-            #     app.logger.debug(f"Best match found through equal file-system paths: {result['Id']} ({app.config['JELLYFIN_SERVER_URL']}/web/#/details?id={result['Id']})")
-            #     best_match = result
-            #     break
-            
-            if not spotify_track:
-                try:
-                    spotify_track = functions.get_cached_spotify_track(track.spotify_track_id)
-                    spotify_track_name = spotify_track['name']
-                    spotify_artists = [artist['name'] for artist in spotify_track['artists']]
-                except Exception as e:
-                    app.logger.error(f"Error fetching track details from Spotify for {track.name}: {str(e)}")
-                    continue
-            
+            try:
+                spotify_track = functions.get_cached_spotify_track(track.spotify_track_id)
+                spotify_track_name = spotify_track['name'].lower()
+                spotify_artists = [artist['name'].lower() for artist in spotify_track['artists']]
+            except Exception as e:
+                app.logger.error(f"\tError fetching track details from Spotify for {track.name}: {str(e)}")
+                continue
             jellyfin_track_name = result.get('Name', '').lower()
             jellyfin_artists = [artist.lower() for artist in result.get('Artists', [])]
-            if (spotify_track_name.lower() == jellyfin_track_name and
-                set(artist.lower() for artist in spotify_artists) == set(jellyfin_artists)):
-                app.logger.debug(f"Quality score for track {result['Name']}: {quality_score} [{result['Path']}]")
+            
+            if spotify_track and jellyfin_track_name and jellyfin_artists and spotify_artists:
+                app.logger.debug("\tTrack details to compare: ")
+                app.logger.debug(f"\t\tJellyfin-Trackname : {jellyfin_track_name}")
+                app.logger.debug(f"\t\t Spotify-Trackname : {spotify_track_name}")
+                app.logger.debug(f"\t\t  Jellyfin-Artists : {jellyfin_artists}")
+                app.logger.debug(f"\t\t   Spotify-Artists : {spotify_artists}")
+                if len(search_results) == 1:
+                    app.logger.debug(f"\tOnly 1 search_result: {result['Id']} ({app.config['JELLYFIN_SERVER_URL']}/web/#/details?id={result['Id']})")
+                    
+                    if (spotify_track_name.lower() == jellyfin_track_name and
+                        set(artist.lower() for artist in spotify_artists) == set(jellyfin_artists)):
+                        
+                        app.logger.debug(f"\tQuality score for track {result['Name']}: {quality_score} [{result['Path']}]")
+                        best_match = result
+                        break
                 
-                if quality_score > best_quality_score:
-                    best_match = result
-                    best_quality_score = quality_score
+                
+                if (spotify_track_name.lower() == jellyfin_track_name and
+                    set(artist.lower() for artist in spotify_artists) == set(jellyfin_artists)):
+                    app.logger.debug(f"\tQuality score for track {result['Name']}: {quality_score} [{result['Path']}]")
+                    
+                    if quality_score > best_quality_score:
+                        best_match = result
+                        best_quality_score = quality_score
 
         return best_match
     except Exception as e:
