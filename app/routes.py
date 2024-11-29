@@ -1,9 +1,28 @@
-from flask import Flask, Response, jsonify, render_template, request, redirect, url_for, session, flash
+import json
+import re
+from flask import Flask, Response, jsonify, render_template, request, redirect, url_for, session, flash, Blueprint, g
 from app import app, db, functions, sp, jellyfin, celery, jellyfin_admin_token, jellyfin_admin_id,device_id,  cache, read_dev_build_file, tasks
 from app.models import JellyfinUser,Playlist,Track
 from celery.result import AsyncResult
+
+from app.providers import base
+from app.providers.base import MusicProviderClient
+from app.providers.spotify import SpotifyClient
+from app.registry.music_provider_registry import MusicProviderRegistry
 from .version import __version__
 from spotipy.exceptions import SpotifyException
+
+pl_bp = Blueprint('playlist', __name__)
+@pl_bp.before_request
+def set_active_provider():
+    """
+    Middleware to select the active provider based on request parameters.
+    """
+    provider_id = request.args.get('provider', 'Spotify')  # Default to Spotify
+    try:
+        g.music_provider = MusicProviderRegistry.get_provider(provider_id)
+    except ValueError as e:
+        return {"error": str(e)}, 400
 
 @app.context_processor
 def add_context():
@@ -45,7 +64,7 @@ def link_issues():
     unlinked_tracks = Track.query.filter_by(downloaded=True,jellyfin_id=None).all()
     tracks = []
     for ult in unlinked_tracks: 
-        sp_track = functions.get_cached_spotify_track(ult.spotify_track_id)
+        sp_track = functions.get_cached_spotify_track(ult.provider_track_id)
         duration_ms = sp_track['duration_ms']
         minutes = duration_ms // 60000
         seconds = (duration_ms % 60000) // 1000
@@ -117,7 +136,7 @@ def login():
                     db.session.add(new_user)
                     db.session.commit()
 
-                return redirect('/playlists')
+                return redirect('/')
         except:
             flash('Login failed. Please check your Jellyfin credentials and try again.', 'error')
             return redirect(url_for('login'))
@@ -130,6 +149,32 @@ def logout():
     session.pop('jellyfin_access_token', None)
     return redirect(url_for('login'))
 
+@app.route('/add_single',methods=['GET'])
+@functions.jellyfin_login_required
+def add_single():
+    playlist = request.args.get('playlist')
+    error = None
+    errdata= None
+    if playlist:
+        parsed = sp._get_id(type='playlist',id=playlist)
+        if parsed:
+            try:
+                functions.get_cached_spotify_playlist(parsed)
+                
+                return redirect(f'/playlist/view/{parsed}')
+            except SpotifyException as e:
+                url_match = re.search(sp._regex_spotify_url, playlist)
+                if url_match is not None:
+                    resp = functions.fetch_spotify_playlist(playlist,None)
+                    parsed_data = functions.parse_spotify_playlist_html(resp)
+                error = (f'Playlist can´t be fetched')
+                
+                errdata = str(e)
+            
+    return render_template('index.html',error_message = error, error_data = errdata)
+
+    
+    
 
 @app.route('/playlists')
 @app.route('/categories')
@@ -147,8 +192,13 @@ def loaditems():
         try:
             db_playlists = db.session.query(Playlist).offset(offset).limit(limit).all()
             max_items = db.session.query(Playlist).count()
-            spotify_playlist_ids = [playlist.spotify_playlist_id for playlist in db_playlists]
-            spotify_data = functions.get_cached_spotify_playlists(tuple(spotify_playlist_ids))
+            
+            provider_playlist_ids = [playlist.provider_playlist_id for playlist in db_playlists]
+            spotify_data = functions.get_cached_spotify_playlists(tuple(provider_playlist_ids))
+            for x in spotify_data['playlists']['items']:
+                for from_db in db_playlists:
+                    if x['id'] == from_db.provider_playlist_id:
+                        x['name'] = from_db.name
             data = functions.prepPlaylistData(spotify_data)
             items_title = "Monitored Playlists"
             items_subtitle = "These playlists are already monitored by the Server. If you add one to your Jellyfin account, they will be available immediately."
@@ -209,11 +259,11 @@ def searchResults():
     context = {}
     if query:
         # Add your logic here to perform the search on Spotify (or Jellyfin)
-        search_result = sp.search(q = query, type= 'track,album,artist,playlist')
+        search_result = sp.search(q = query, type= 'playlist',limit= 50, market=app.config['SPOTIFY_COUNTRY_CODE'])
         context = {
-            'artists' : functions.prepArtistData(search_result ),
+            #'artists' : functions.prepArtistData(search_result ),
             'playlists' : functions.prepPlaylistData(search_result ),
-            'albums' : functions.prepAlbumData(search_result ),
+            #'albums' : functions.prepAlbumData(search_result ),
             'query' : query
         }
         return render_template('search.html', **context)
@@ -221,14 +271,14 @@ def searchResults():
         return render_template('search.html', query=None, results={})
 
 
-@app.route('/playlist/view/<playlist_id>')
+@pl_bp.route('/playlist/view/<playlist_id>')
 @functions.jellyfin_login_required
 def get_playlist_tracks(playlist_id):
-    # Hol dir alle Tracks für die Playlist
-    data = functions.get_full_playlist_data(playlist_id)  # Diese neue Funktion holt alle Tracks der Playlist
-    tracks = functions.get_tracks_for_playlist(data)  # Deine Funktion, um Tracks zu holen
+    provider: MusicProviderClient = g.music_provider  # Explicit type hint for g.music_provider
+    playlist: base.Playlist = provider.get_playlist(playlist_id)
+    tracks = functions.get_tracks_for_playlist(playlist.tracks)  # Deine Funktion, um Tracks zu holen
     # Berechne die gesamte Dauer der Playlist
-    total_duration_ms = sum([track['track']['duration_ms'] for track in data['tracks'] if track['track']])
+    total_duration_ms = sum([track['track']['duration_ms'] for track in data['tracks']['items'] if track['track']])
 
     # Konvertiere die Gesamtdauer in ein lesbares Format
     hours, remainder = divmod(total_duration_ms // 1000, 3600)
@@ -263,7 +313,7 @@ def associate_track():
         flash('Missing Jellyfin or Spotify ID')
 
     # Retrieve the track by Spotify ID
-    track = Track.query.filter_by(spotify_track_id=spotify_id).first()
+    track = Track.query.filter_by(provider_track_id=spotify_id).first()
 
     if not track:
         flash('Track not found')
@@ -296,4 +346,10 @@ def unlock_key():
 
 @app.route('/test')
 def test():
+    playlist_id = "37i9dQZF1DX12qgyzUprB6"
+    client = SpotifyClient(cookie_file='/jellyplist/open.spotify.com_cookies.txt')
+    client.authenticate()
+    pl = client.get_playlist(playlist_id=playlist_id)
+    browse = client.browse_all()
+    page = client.browse_page(browse[0].items[12])
     return ''

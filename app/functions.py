@@ -1,4 +1,7 @@
+import json
+from typing import Optional
 from flask import flash, redirect, session, url_for
+import requests
 from app.models import JellyfinUser, Playlist,Track  
 from app import sp, cache, app, jellyfin  ,jellyfin_admin_token, jellyfin_admin_id,device_id, cache
 from functools import  wraps
@@ -57,51 +60,57 @@ def prepPlaylistData(data):
         
     for playlist_data in data['playlists']['items']:
         # Fetch the playlist from the database if it exists
-        db_playlist = Playlist.query.filter_by(spotify_playlist_id=playlist_data['id']).first()
+        if playlist_data:
+            db_playlist = Playlist.query.filter_by(provider_playlist_id=playlist_data['id']).first()
 
-        if db_playlist:
-            # If the playlist is in the database, use the stored values
-            if isinstance(playlist_data['tracks'],list):
-                track_count = len(playlist_data['tracks']    )
+            if db_playlist:
+                # If the playlist is in the database, use the stored values
+                if playlist_data.get('tracks'):
+                    if isinstance(playlist_data['tracks'],list):
+                        track_count = len(playlist_data['tracks']    )
+                    else:
+                        track_count = playlist_data['tracks']['total'] or 0
+                else:
+                    track_count = 0
+                tracks_available = db_playlist.tracks_available or 0
+                tracks_linked = len([track for track in db_playlist.tracks if track.jellyfin_id]) or 0
+                percent_available = (tracks_available / track_count * 100) if track_count > 0 else 0
+                
+                # Determine playlist status
+                if not playlist_data.get('status'):
+                    if tracks_available == track_count and track_count > 0:
+                        playlist_data['status'] = 'green'  # Fully available
+                    elif tracks_available > 0:
+                        playlist_data['status'] = 'yellow'  # Partially available
+                    else:
+                        playlist_data['status'] = 'red'  # Not available
+                 
             else:
-                track_count = playlist_data['tracks']['total'] or 0
-            tracks_available = db_playlist.tracks_available or 0
-            tracks_linked = len([track for track in db_playlist.tracks if track.jellyfin_id]) or 0
-            percent_available = (tracks_available / track_count * 100) if track_count > 0 else 0
-            
-            # Determine playlist status
-            if tracks_available == track_count and track_count > 0:
-                status = 'green'  # Fully available
-            elif tracks_available > 0:
-                status = 'yellow'  # Partially available
-            else:
-                status = 'red'  # Not available
-        else:
-            # If the playlist is not in the database, initialize with 0
-            track_count = 0
-            tracks_available = 0
-            tracks_linked  = 0 
-            percent_available = 0
-            status = 'red'  # Not requested yet
+                # If the playlist is not in the database, initialize with 0
+                track_count = 0
+                tracks_available = 0
+                tracks_linked  = 0 
+                percent_available = 0
+                playlist_data['status'] = 'red'  # Not requested yet
 
-        # Append playlist data to the list
-        playlists.append({
-            'name': playlist_data['name'],
-            'description': playlist_data['description'],
-            'image': playlist_data['images'][0]['url'] if playlist_data['images'] else 'default-image.jpg',
-            'url': playlist_data['external_urls']['spotify'],
-            'id': playlist_data['id'],
-            'jellyfin_id': db_playlist.jellyfin_id if db_playlist else '',
-            'can_add': (db_playlist not in jellyfin_user.playlists) if db_playlist else True,
-            'can_remove' : (db_playlist in jellyfin_user.playlists) if db_playlist else False, 
-            'last_updated':db_playlist.last_updated if db_playlist else '',
-            'last_changed':db_playlist.last_changed if db_playlist else '',
-            'tracks_available': tracks_available,
-            'track_count': track_count,
-            'tracks_linked': tracks_linked,
-            'percent_available': percent_available,
-            'status': status  # Red, yellow, or green based on availability
-        })
+            # Append playlist data to the list
+            playlists.append({
+                'name': playlist_data['name'],
+                'description': playlist_data['description'],
+                'image': playlist_data['images'][0]['url'] if playlist_data.get('images') else '/static/images/placeholder.png',
+                'url': playlist_data['external_urls']['spotify'] if playlist_data.get('external_urls') else '',
+                'id': playlist_data['id'] if playlist_data['id'] else '',
+                'jellyfin_id': db_playlist.jellyfin_id if db_playlist else '',
+                'can_add': (db_playlist not in jellyfin_user.playlists) if db_playlist else True,
+                'can_remove' : (db_playlist in jellyfin_user.playlists) if db_playlist else False, 
+                'last_updated':db_playlist.last_updated if db_playlist else '',
+                'last_changed':db_playlist.last_changed if db_playlist else '',
+                'tracks_available': tracks_available,
+                'track_count': track_count,
+                'tracks_linked': tracks_linked,
+                'percent_available': percent_available,
+                'status': playlist_data['status']  # Red, yellow, or green based on availability
+            })
     
     return playlists
 
@@ -115,24 +124,57 @@ def get_cached_spotify_playlists(playlist_ids):
     spotify_data = {'playlists': {'items': []}}
     
     for playlist_id in playlist_ids:
-        playlist_data = get_cached_spotify_playlist(playlist_id)
+        playlist_data = None
+        not_found = False
+        try:
+            playlist_data = get_cached_spotify_playlist(playlist_id)
+            
+        except SpotifyException as e:
+            app.logger.error(f"Error Fetching Playlist {playlist_id}: {e}")
+            not_found = 'http status: 404' in str(e)
+        if not_found:
+            playlist_data = {
+                'status':'red',
+                'description': 'Playlist has most likely been removed. You can keep it, but won´t receive Updates.',
+                'id': playlist_id,
+                'name' : ''
+                
+            }
+
         if playlist_data:
             spotify_data['playlists']['items'].append(playlist_data)
-        else:
-            app.logger.warning(f"Playlist data for ID {playlist_id} could not be retrieved.")
     
     return spotify_data
 
-@cache.memoize(timeout=3600)  
-def get_cached_spotify_playlist(playlist_id):
+@cache.memoize(timeout=3600)
+def get_cached_playlist(playlist_id):
     """
     Fetches a Spotify playlist by its ID, utilizing caching to minimize API calls.
 
     :param playlist_id: The Spotify playlist ID.
     :return: Playlist data as a dictionary, or None if an error occurs.
     """
-    playlist_data = sp.playlist(playlist_id)  # Fetch data from Spotify API
-    return playlist_data
+    # When the playlist_id starts with 37i9dQZF1, we need to use the new function
+    # as the standard Spotify API endpoints are deprecated for these playlists.
+    # Reference: https://github.com/kamilkosek/jellyplist/issues/25
+    
+    if playlist_id.startswith("37i9dQZF1"):
+        app.logger.warning(f"Algorithmic or Spotify-owned editorial playlist, using custom Implementation to fetch details")
+        # Use the custom implementation for these playlists
+        try:
+            data = fetch_spotify_playlist(playlist_id)
+            return transform_playlist_response(data)
+        except Exception as e:
+            print(f"Error fetching playlist with custom method: {e}")
+            return None
+
+    # Otherwise, use the standard Spotipy API
+    try:
+        playlist_data = sp.playlist(playlist_id)  # Fetch data using Spotipy
+        return playlist_data
+    except Exception as e:
+        print(f"Error fetching playlist with Spotipy: {e}")
+        return None
 
 @cache.memoize(timeout=3600*24*10)  
 def get_cached_spotify_track(track_id):
@@ -189,7 +231,7 @@ def getFeaturedPlaylists(country: str, offset: int):
 
 def getCategoryPlaylists(category: str, offset: int):
     try:
-        playlists_data = sp.category_playlists(category_id=category, limit=16, offset=offset)
+        playlists_data = sp.category_playlists(category_id=category, country=app.config['SPOTIFY_COUNTRY_CODE'], limit=16, offset=offset)
         return prepPlaylistData(playlists_data), playlists_data['playlists']['total'], f"Category {playlists_data['message']}"
     except SpotifyException as e:
         app.logger.error(f"Spotify API error in getCategoryPlaylists: {e}")
@@ -215,14 +257,14 @@ def get_tracks_for_playlist(data):
     tracks = []
     is_admin = session.get('is_admin', False)
 
-    for idx, item in enumerate(results['tracks']):
+    for idx, item in enumerate(results['tracks']['items']):
         track_data = item['track']
         if track_data:
             duration_ms = track_data['duration_ms']
             minutes = duration_ms // 60000
             seconds = (duration_ms % 60000) // 1000
 
-            track_db = Track.query.filter_by(spotify_track_id=track_data['id']).first()
+            track_db = Track.query.filter_by(provider_track_id=track_data['id']).first()
 
             if track_db:
                 downloaded = track_db.downloaded

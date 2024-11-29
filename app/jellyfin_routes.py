@@ -16,25 +16,37 @@ def jellyfin_playlists():
     try:
         # Fetch playlists from Jellyfin
         playlists = jellyfin.get_playlists(session_token=functions._get_token_from_sessioncookie())
-        
+        spotify_data = {'playlists': {'items': []}}
+
         # Extract Spotify playlist IDs from the database
-        spotify_playlist_ids = []
         for pl in playlists:
             # Retrieve the playlist from the database using Jellyfin ID
             from_db = Playlist.query.filter_by(jellyfin_id=pl['Id']).first()
-            if from_db and from_db.spotify_playlist_id:
-                spotify_playlist_ids.append(from_db.spotify_playlist_id)
+            playlist_data = None
+            not_found = False
+            if from_db and from_db.provider_playlist_id:
+                pl_id = from_db.provider_playlist_id
+                try:
+                    playlist_data = functions.get_cached_spotify_playlist(pl_id)
+                      
+                except SpotifyException as e:
+                    app.logger.error(f"Error Fetching Playlist {pl_id}: {e}")
+                    not_found = 'http status: 404' in str(e)
+                if not_found:
+                    playlist_data = {
+                        'status':'red',
+                        'description': 'Playlist has most likely been removed. You can keep it, but won´t receive Updates.',
+                        'id': from_db.provider_playlist_id,
+                        'name' : from_db.name
+                        
+                    }
+
+                if playlist_data:
+                    spotify_data['playlists']['items'].append(playlist_data)
+
             else:
                 app.logger.warning(f"No database entry found for Jellyfin playlist ID: {pl['Id']}")
 
-        if not spotify_playlist_ids:
-            flash('No Spotify playlists found to display.', 'warning')
-            return render_template('jellyfin_playlists.html', playlists=functions.prepPlaylistData({'playlists': {'items': []}}))
-        
-        # Use the cached function to fetch Spotify playlists
-        spotify_data = functions.get_cached_spotify_playlists(spotify_playlist_ids)
-        
-        # Prepare the data for the template
         prepared_data = functions.prepPlaylistData(spotify_data)
         
         return render_template('jellyfin_playlists.html', playlists=prepared_data)
@@ -63,13 +75,13 @@ def add_playlist():
         playlist_data = functions.get_cached_spotify_playlist(playlist_id)
 
         # Check if playlist already exists in the database
-        playlist = Playlist.query.filter_by(spotify_playlist_id=playlist_id).first()
+        playlist = Playlist.query.filter_by(provider_playlist_id=playlist_id).first()
 
         if not playlist:
             # Add new playlist if it doesn't exist
             # create the playlist via api key, with the first admin as 'owner' 
             fromJellyfin = jellyfin.create_music_playlist(functions._get_api_token(),playlist_data['name'],[],functions._get_admin_id())['Id']
-            playlist = Playlist(name=playlist_data['name'], spotify_playlist_id=playlist_id,spotify_uri=playlist_data['uri'],track_count = playlist_data['tracks']['total'], tracks_available=0, jellyfin_id = fromJellyfin)
+            playlist = Playlist(name=playlist_data['name'], provider_playlist_id=playlist_id,provider_uri=playlist_data['uri'],track_count = playlist_data['tracks']['total'], tracks_available=0, jellyfin_id = fromJellyfin)
             db.session.add(playlist)
             db.session.commit()
             if app.config['START_DOWNLOAD_AFTER_PLAYLIST_ADD']:
@@ -83,7 +95,7 @@ def add_playlist():
         spotify_tracks = {}
         offset = 0
         while True:
-            playlist_items = sp.playlist_items(playlist.spotify_playlist_id, offset=offset, limit=100)
+            playlist_items = sp.playlist_items(playlist.provider_playlist_id, offset=offset, limit=100)
             items = playlist_items['items']
             spotify_tracks.update({offset + idx: track['track'] for idx, track in enumerate(items) if track['track']})
             
@@ -94,11 +106,11 @@ def add_playlist():
             track_info = track_data
             if not track_info:
                 continue
-            track = Track.query.filter_by(spotify_track_id=track_info['id']).first()
+            track = Track.query.filter_by(provider_track_id=track_info['id']).first()
 
             if not track:
                 # Add new track if it doesn't exist
-                track = Track(name=track_info['name'], spotify_track_id=track_info['id'], spotify_uri=track_info['uri'], downloaded=False)
+                track = Track(name=track_info['name'], provider_track_id=track_info['id'], provider_uri=track_info['uri'], downloaded=False)
                 db.session.add(track)
                 db.session.commit()
             elif track.downloaded:
@@ -158,7 +170,7 @@ def delete_playlist(playlist_id):
         flash('Playlist removed')
         item = {
             "name" : playlist.name,
-            "id" : playlist.spotify_playlist_id,
+            "id" : playlist.provider_playlist_id,
             "can_add":True,
             "can_remove":False,
             "jellyfin_id" : playlist.jellyfin_id
@@ -182,7 +194,7 @@ def wipe_playlist(playlist_id):
     if playlist:
         # Delete the playlist
         name = playlist.name
-        id = playlist.spotify_playlist_id
+        id = playlist.provider_playlist_id
         jf_id = playlist.jellyfin_id
         db.session.delete(playlist)
         db.session.commit()

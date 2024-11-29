@@ -22,8 +22,8 @@ user_playlists = db.Table('user_playlists',
 class Playlist(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(150), nullable=False)
-    spotify_playlist_id = db.Column(db.String(120), unique=True, nullable=False)
-    spotify_uri = db.Column(db.String(120), unique=True, nullable=False)
+    provider_playlist_id = db.Column(db.String(120), unique=True, nullable=False)
+    provider_uri = db.Column(db.String(120), unique=True, nullable=False)
     
     # Relationship with Tracks
     tracks = db.relationship('Track', secondary='playlist_tracks', back_populates='playlists')
@@ -37,7 +37,7 @@ class Playlist(db.Model):
     users = db.relationship('JellyfinUser', secondary=user_playlists, back_populates='playlists')
 
     def __repr__(self):
-        return f'<Playlist {self.name}:{self.spotify_playlist_id}>'
+        return f'<Playlist {self.name}:{self.provider_playlist_id}>'
 
 # Association table between Playlists and Tracks
 playlist_tracks = db.Table('playlist_tracks',
@@ -50,8 +50,8 @@ playlist_tracks = db.Table('playlist_tracks',
 class Track(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(150), nullable=False)
-    spotify_track_id = db.Column(db.String(120), unique=True, nullable=False)
-    spotify_uri = db.Column(db.String(120), unique=True, nullable=False)
+    provider_track_id = db.Column(db.String(120), unique=True, nullable=False)
+    provider_uri = db.Column(db.String(120), unique=True, nullable=False)
     downloaded = db.Column(db.Boolean())
     filesystem_path = db.Column(db.String(), nullable=True)
     jellyfin_id = db.Column(db.String(120), nullable=True)  # Add Jellyfin track ID field
@@ -60,4 +60,4 @@ class Track(db.Model):
     # Many-to-Many relationship with Playlists
     playlists = db.relationship('Playlist', secondary=playlist_tracks, back_populates='tracks')
     def __repr__(self):
-        return f'<Track {self.name}:{self.spotify_track_id}>'
+        return f'<Track {self.name}:{self.provider_track_id}>'
