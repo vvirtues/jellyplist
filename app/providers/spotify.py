@@ -32,7 +32,10 @@ class SpotifyClient(MusicProviderClient):
     """
     Spotify implementation of the MusicProviderClient.
     """
-
+    @property
+    def _identifier(self) -> str:
+        return "Spotify"
+    
     def __init__(self, cookie_file: Optional[str] = None):
         self.base_url = "https://api-partner.spotify.com"
         self.session_data = None

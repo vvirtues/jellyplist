@@ -88,7 +88,15 @@ class MusicProviderClient(ABC):
     """
     Abstract base class defining the interface for music provider clients.
     """
-
+    @property
+    @abstractmethod
+    def _identifier(self) -> str:
+        """
+        A unique identifier for the music provider.
+        Must be implemented by all subclasses.
+        """
+        pass
+    
     @abstractmethod
     def authenticate(self, credentials: dict) -> None:
         """
