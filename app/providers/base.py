@@ -2,6 +2,8 @@ from dataclasses import dataclass, field
 from typing import List, Optional
 from abc import ABC, abstractmethod
 
+
+
 @dataclass
 class ExternalUrl:
     url: str
@@ -12,6 +14,26 @@ class ItemBase:
     name: str
     uri: str
     external_urls: Optional[List[ExternalUrl]]
+    
+@dataclass
+class Profile:
+    avatar: Optional[str]  # Avatar URL or None
+    avatar_background_color: Optional[int]
+    name: str
+    uri: str
+    username: str
+    
+@dataclass
+class AccountAttributes:
+    catalogue: str
+    dsa_mode_available: bool
+    dsa_mode_enabled: bool
+    multi_user_plan_current_size: Optional[int]
+    multi_user_plan_member_type: Optional[str]
+    on_demand: bool
+    opt_in_trial_premium_only_market: bool
+    country: str
+    product: str
 
 @dataclass
 class Image:
