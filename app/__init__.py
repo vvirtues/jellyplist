@@ -21,6 +21,7 @@ from flask_caching import Cache
 from .version import __version__
 
 
+
 def check_db_connection(db_uri, retries=5, delay=5):
     """
     Check if the database is reachable.
@@ -161,12 +162,21 @@ celery.set_default()
 app.logger.info(f'Jellyplist {__version__}{read_dev_build_file()} started')
 app.logger.debug(f"Debug logging active")
 from app import routes
+app.register_blueprint(routes.pl_bp)
+
 from app import jellyfin_routes, tasks
 if "worker" in sys.argv:
     tasks.release_lock("download_missing_tracks_lock")
-    
+
 from app import filters  # Import the filters dictionary
 
 # Register all filters
 for name, func in filters.filters.items():
     app.jinja_env.filters[name] = func
+    
+    
+from .providers import SpotifyClient
+spotify_client = SpotifyClient('/jellyplist/open.spotify.com_cookies.txt')
+spotify_client.authenticate()
+from .registry import MusicProviderRegistry
+MusicProviderRegistry.register_provider(spotify_client)
