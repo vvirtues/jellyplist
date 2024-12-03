@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 import os
-from app.providers.base import AccountAttributes, Album, Artist, Image, MusicProviderClient, Owner,Playlist, PlaylistTrack, Profile,Track,ExternalUrl,Category
+from app.providers.base import AccountAttributes, Album, Artist, BrowseCard, BrowseSection, Image, MusicProviderClient, Owner, Playlist, PlaylistTrack, Profile, Track, ExternalUrl, Category
 import requests
 
 import json
@@ -12,21 +12,6 @@ from http.cookiejar import MozillaCookieJar
 import logging
 
 l = logging.getLogger(__name__)
-
-@dataclass
-class BrowseCard:
-    title: str
-    uri: str
-    background_color: str
-    artwork: List[Image]
-
-
-@dataclass
-class BrowseSection:
-    title: str
-    items: List[BrowseCard]
-    uri: str
-
 
 class SpotifyClient(MusicProviderClient):
     """
@@ -201,12 +186,15 @@ class SpotifyClient(MusicProviderClient):
         :param album_data: Dictionary representing an album.
         :return: An Album instance.
         """
+        artists = []
+        if album_data.get("artists"):
+            artists = [self._parse_artist(artist) for artist in album_data.get("artists").get('items', [])]
         return Album(
             id=album_data["uri"].split(":")[-1],
             name=album_data["name"],
             uri=album_data["uri"],
             external_urls=self._parse_external_urls(album_data["uri"], "album"),
-            artists=[self._parse_artist(artist) for artist in album_data["artists"]["items"]],
+            artists=artists,
             images=self._parse_images(album_data["coverArt"]["sources"])
         )
 
@@ -218,15 +206,33 @@ class SpotifyClient(MusicProviderClient):
         :param track_data: Dictionary representing a track.
         :return: A Track instance.
         """
+        duration_ms = 0
+        aritsts = []
+        if track_data.get("duration"):
+            duration_ms = int(track_data.get("duration", 0).get("totalMilliseconds", 0))
+        elif track_data.get("trackDuration"):
+            duration_ms = track_data["trackDuration"]["totalMilliseconds"] 
+        
+        if track_data.get("firstArtist"):
+            for artist in track_data.get("firstArtist").get('items', []):
+                aritsts.append(self._parse_artist(artist))
+        elif track_data.get("artists"):
+            for artist in track_data.get("artists").get('items', []):
+                aritsts.append(self._parse_artist(artist))
+        
+        if track_data.get("albumOfTrack"):
+            album = self._parse_album(track_data["albumOfTrack"])
+        
+            
         return Track(
             id=track_data["uri"].split(":")[-1],
             name=track_data["name"],
             uri=track_data["uri"],
             external_urls=self._parse_external_urls(track_data["uri"], "track"),
-            duration_ms=track_data["trackDuration"]["totalMilliseconds"],
+            duration_ms=duration_ms,
             explicit=track_data.get("explicit", False),
             album=self._parse_album(track_data["albumOfTrack"]),
-            artists=[self._parse_artist(artist) for artist in track_data["artists"]["items"]]
+            artists=aritsts
         )
     def _parse_owner(self, owner_data: Dict) -> Optional[Owner]:
         """
@@ -283,10 +289,14 @@ class SpotifyClient(MusicProviderClient):
         owner_data = playlist_data.get("ownerV2", {}).get("data", {})
         owner = self._parse_owner(owner_data)
 
-        tracks = [
-            self._parse_track(item["itemV2"]["data"])
-            for item in playlist_data.get("content", {}).get("items", [])
-        ]
+        
+        valid_tracks = []
+        for item in playlist_data.get("content", {}).get("items", []):
+            data = item.get("itemV2", {}).get("data", {})
+            uri = data.get("uri", "")
+            if uri.startswith("spotify:track"):
+                valid_tracks.append(self._parse_track(data))
+        tracks = valid_tracks
 
         return Playlist(
             id=playlist_data.get("uri", "").split(":")[-1],
@@ -369,16 +379,61 @@ class SpotifyClient(MusicProviderClient):
 
         playlist_data["content"]["items"] = all_items
         return self._parse_playlist(playlist_data)
-
-    def search_tracks(self, query: str, limit: int = 10) -> List[Track]:
+    
+    def extract_playlist_id(self, uri: str) -> str:
         """
-        Searches for tracks on Spotify.
+        Extract the playlist ID from a Spotify URI.
+        """
+        # check whether the uri is a full url with https or just a uri
+        if uri.startswith("https://open.spotify.com/"):
+            #if it starts with https, we need to extract the playlist id from the url
+            return uri.split('/')[-1]
+        elif uri.startswith("spotify:playlist:"):
+            return uri.split(':')[-1]
+        else :
+            raise ValueError("Invalid Spotify URI.")
+
+    def search_playlist(self, query: str, limit: int = 50) -> List[Playlist]:
+        """
+        Searches for playlists on Spotify.
         :param query: Search query.
         :param limit: Maximum number of results.
-        :return: A list of Track objects.
+        :return: A list of Playlist objects.
         """
-        print(f"search_tracks: Placeholder for search with query '{query}' and limit {limit}.")
-        return []
+        query_parameters = {
+            "operationName": "searchDesktop",
+            "variables": json.dumps({
+            "searchTerm": query,
+            "offset": 0,
+            "limit": limit,
+            "numberOfTopResults": 5,
+            "includeAudiobooks": False,
+            "includeArtistHasConcertsField": False,
+            "includePreReleases": False,
+            "includeLocalConcertsField": False
+            }),
+            "extensions": json.dumps({
+            "persistedQuery": {
+                "version": 1,
+                "sha256Hash": "f1f1c151cd392433ef4d2683a10deb9adeefd660f29692d8539ce450d2dfdb96"
+            }
+            })
+        }
+        encoded_query = urlencode(query_parameters)
+        url = f"pathfinder/v1/query?{encoded_query}"
+
+        try:
+            response = self._make_request(url)
+            search_data = response.get("data", {}).get("searchV2", {})
+            playlists_data = search_data.get("playlists", {}).get("items", [])
+
+            playlists = [self._parse_playlist(item["data"]) for item in playlists_data]
+            return playlists
+
+        except Exception as e:
+            print(f"An error occurred while searching for playlists: {e}")
+            return []
+        
 
     def get_track(self, track_id: str) -> Track:
         """
@@ -386,37 +441,30 @@ class SpotifyClient(MusicProviderClient):
         :param track_id: The ID of the track.
         :return: A Track object.
         """
-        print(f"get_track: Placeholder for track with ID {track_id}.")
-        return Track(id=track_id, name="", uri="", duration_ms=0, explicit=False, album=Album(), artists=[], external_urls= ExternalUrl())
+        query_parameters = {
+            "operationName": "getTrack",
+            "variables": json.dumps({
+                "uri": f"spotify:track:{track_id}"
+            }),
+            "extensions": json.dumps({
+                "persistedQuery": {
+                    "version": 1,
+                    "sha256Hash": "5c5ec8c973a0ac2d5b38d7064056c45103c5a062ee12b62ce683ab397b5fbe7d"
+                }
+            })
+        }
+        encoded_query = urlencode(query_parameters)
+        url = f"pathfinder/v1/query?{encoded_query}"
 
-    def get_featured_playlists(self, limit: int = 10) -> List[Playlist]:
-        """
-        Fetches featured playlists.
-        :param limit: Maximum number of results.
-        :return: A list of Playlist objects.
-        """
-        print(f"get_featured_playlists: Placeholder for featured playlists with limit {limit}.")
-        return []
+        try:
+            response = self._make_request(url)
+            track_data = response.get("data", {}).get("trackUnion", {})
+            return self._parse_track(track_data)
 
-    def get_playlists_by_category(self, category_id: str, limit: int = 10) -> List[Playlist]:
-        """
-        Fetches playlists for a specific category.
-        :param category_id: The ID of the category.
-        :param limit: Maximum number of results.
-        :return: A list of Playlist objects.
-        """
-        print(f"get_playlists_by_category: Placeholder for playlists in category {category_id}.")
-        return []
+        except Exception as e:
+            print(f"An error occurred while fetching the track: {e}")
+            return None
 
-    def get_categories(self, limit: int = 10) -> List[Category]:
-        """
-        Fetches categories from Spotify.
-        :param limit: Maximum number of results.
-        :return: A list of Category objects.
-        """
-        print(f"get_categories: Placeholder for categories with limit {limit}.")
-        return []
-    
     
     # non generic method implementations: 
     def get_profile(self) -> Optional[Profile]:
@@ -506,14 +554,17 @@ class SpotifyClient(MusicProviderClient):
         except Exception as e:
             print(f"An error occurred while fetching account attributes: {e}")
             return None
-    def browse_all(self, page_limit: int = 50, section_limit: int = 99) -> List[BrowseSection]:
+    def browse(self, **kwargs) -> List[BrowseSection]:
         """
         Fetch all browse sections with cards.
 
-        :param page_limit: Maximum number of pages to fetch.
-        :param section_limit: Maximum number of sections per page.
+        :param kwargs: Keyword arguments. Supported:
+            - page_limit: Maximum number of pages to fetch (default: 50)
+            - section_limit: Maximum number of sections per page (default: 99)
         :return: A list of BrowseSection objects.
         """
+        page_limit = kwargs.get('page_limit', 50)
+        section_limit = kwargs.get('section_limit', 99)
         query_parameters = {
             "operationName": "browseAll",
             "variables": json.dumps({
@@ -541,22 +592,23 @@ class SpotifyClient(MusicProviderClient):
             print(f"An error occurred while fetching browse sections: {e}")
             return []
         
-    def browse_page(self, card: BrowseCard) -> List[Playlist]:
+    def browse_page(self, uri: str) -> List[Playlist]:
         """
-        Fetch the content of a browse page using the URI from a BrowseCard.
+        Fetch the content of a browse page using the URI.
 
-        :param card: A BrowseCard instance with a URI starting with 'spotify:page'.
+        :param uri: Should start with 'spotify:page'.
         :return: A list of Playlist objects from the browse page.
         """
-        if not card.uri.startswith("spotify:page"):
-            raise ValueError("The BrowseCard URI must start with 'spotify:page'.")
+        
+        if not uri or not uri.startswith("spotify:page"):
+            raise ValueError("The 'uri' parameter must be provided and start with 'spotify:page'.")
 
         query_parameters = {
             "operationName": "browsePage",
             "variables": json.dumps({
                 "pagePagination": {"offset": 0, "limit": 10},
                 "sectionPagination": {"offset": 0, "limit": 10},
-                "uri": card.uri
+                "uri": uri
             }),
             "extensions": json.dumps({
                 "persistedQuery": {

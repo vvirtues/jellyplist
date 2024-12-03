@@ -82,6 +82,19 @@ class Playlist(ItemBase):
     images: Optional[List[Image]]
     owner: Optional[Owner]
     tracks: List[PlaylistTrack] = field(default_factory=list)
+@dataclass
+class BrowseCard:
+    title: str
+    uri: str
+    background_color: str
+    artwork: List[Image]
+
+
+@dataclass
+class BrowseSection:
+    title: str
+    items: List[BrowseCard]
+    uri: str
 
 # Abstract base class for music providers
 class MusicProviderClient(ABC):
@@ -113,9 +126,19 @@ class MusicProviderClient(ABC):
         :return: A Playlist object.
         """
         pass
+    @abstractmethod
+    def extract_playlist_id(self, uri: str) -> str:
+        """
+        Extracts the playlist ID from a playlist URI.
+        :param uri: The playlist URI.
+        :return: The playlist ID.
+        """
+        pass
+    
+    
 
     @abstractmethod
-    def search_tracks(self, query: str, limit: int = 50) -> List[Track]:
+    def search_playlist(self, query: str, limit: int = 50) -> List[Playlist]:
         """
         Searches for tracks based on a query string.
         :param query: The search query.
@@ -133,29 +156,18 @@ class MusicProviderClient(ABC):
         """
         pass
     @abstractmethod
-    def get_featured_playlists(self, limit: int = 50) -> List[Playlist]:
+    def browse(self, **kwargs) -> List[BrowseSection]:
         """
-        Fetches a list of featured playlists.
-        :param limit: Maximum number of featured playlists to return.
-        :return: A list of Playlist objects.
-        """
-        pass
-
-    @abstractmethod
-    def get_playlists_by_category(self, category_id: str, limit: int = 50) -> List[Playlist]:
-        """
-        Fetches playlists belonging to a specific category.
-        :param category_id: The ID of the category.
-        :param limit: Maximum number of playlists to return.
-        :return: A list of Playlist objects.
+        Generic browse method for the music provider.
+        :param kwargs: Variable keyword arguments to support different browse parameters
+        :return: A dictionary containing browse results
         """
         pass
-
     @abstractmethod
-    def get_categories(self, limit: int = 50) -> List[Category]:
+    def browse_page(self, uri: str) -> List[Playlist]:
         """
-        Fetches a list of available categories.
-        :param limit: Maximum number of categories to return.
-        :return: A list of categories, where each category is a dictionary with 'id' and 'name'.
+        Fetches a specific page of browse results.
+        :param uri: The uri to query.
+        :return: A list of Playlist objects.
         """
         pass

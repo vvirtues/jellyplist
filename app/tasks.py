@@ -1,6 +1,7 @@
 from datetime import datetime,timezone
 import logging
 import subprocess
+from typing import List
 
 from sqlalchemy import insert
 from app import celery, app, db, functions, sp, jellyfin, jellyfin_admin_token, jellyfin_admin_id
@@ -10,8 +11,8 @@ from app.models import JellyfinUser,Playlist,Track, user_playlists, playlist_tra
 import os
 import redis
 from celery import current_task,signals
-import asyncio
-import requests
+
+from app.registry.music_provider_registry import MusicProviderRegistry
 
 redis_client = redis.StrictRedis(host='redis', port=6379, db=0)
 def acquire_lock(lock_name, expiration=60):
@@ -96,7 +97,8 @@ def download_missing_tracks(self):
                 client_secret = app.config['SPOTIFY_CLIENT_SECRET']
                 search_before_download = app.config['SEARCH_JELLYFIN_BEFORE_DOWNLOAD']
 
-                undownloaded_tracks = Track.query.filter_by(downloaded=False).all()
+                # Downloading using SpotDL only works for Spotify tracks
+                undownloaded_tracks : List[Track] = Track.query.filter_by(downloaded=False,provider_id = "Spotify").all()
                 total_tracks = len(undownloaded_tracks)
                 if not undownloaded_tracks:
                     app.logger.info("No undownloaded tracks found.")
@@ -113,7 +115,7 @@ def download_missing_tracks(self):
                     # region search before download
                     if search_before_download:
                         app.logger.info(f"Searching for track in Jellyfin: {track.name}")
-                        spotify_track = functions.get_cached_spotify_track(track.provider_track_id)
+                        spotify_track = functions.get_cached_provider_track(track.provider_track_id, provider_id="Spotify")
                         # at first try to find the track without fingerprinting it
                         best_match = find_best_match_from_jellyfin(track)
                         if best_match:
@@ -123,39 +125,39 @@ def download_missing_tracks(self):
                                 app.logger.info(f"Updated Jellyfin ID for track: {track.name} ({track.provider_track_id})")
                             if track.filesystem_path != best_match['Path']:
                                 track.filesystem_path = best_match['Path']
-                            
-                            db.session.commit()     
-                            processed_tracks+=1   
+                            db.session.commit()
+                            processed_tracks+=1
                             continue                
                         
                         # region search with fingerprinting   
-                        if spotify_track:                     
-                            preview_url = spotify_track.get('preview_url')
-                            if not preview_url:
-                                app.logger.error(f"Preview URL not found for track {track.name}.")
-                                # Decide whether to skip or proceed to download
-                                # For now, we'll proceed to download
-                            else:
-                                # Get the list of Spotify artist names
-                                spotify_artists = [artist['name'] for artist in spotify_track['artists']]
+                        # as long as there is no endpoint found providing a preview url, we can't use this feature
+                        # if spotify_track:                     
+                        #     preview_url = spotify_track.get('preview_url')
+                        #     if not preview_url:
+                        #         app.logger.error(f"Preview URL not found for track {track.name}.")
+                        #         # Decide whether to skip or proceed to download
+                        #         # For now, we'll proceed to download
+                        #     else:
+                        #         # Get the list of Spotify artist names
+                        #         spotify_artists = [artist['name'] for artist in spotify_track['artists']]
 
-                                # Perform the search in Jellyfin
-                                match_found, jellyfin_file_path = jellyfin.search_track_in_jellyfin(
-                                    session_token=jellyfin_admin_token,
-                                    preview_url=preview_url,
-                                    song_name=track.name,
-                                    artist_names=spotify_artists
-                                )
-                                if match_found:
-                                    app.logger.info(f"Match found in Jellyfin for track {track.name}. Skipping download.")
-                                    track.downloaded = True
-                                    track.filesystem_path = jellyfin_file_path
-                                    db.session.commit()
-                                    continue
-                                else:
-                                    app.logger.info(f"No match found in Jellyfin for track {track.name}. Proceeding to download.")
-                        else:
-                            app.logger.warning(f"spotify_track not set, see previous log messages")
+                        #         # Perform the search in Jellyfin
+                        #         match_found, jellyfin_file_path = jellyfin.search_track_in_jellyfin(
+                        #             session_token=jellyfin_admin_token,
+                        #             preview_url=preview_url,
+                        #             song_name=track.name,
+                        #             artist_names=spotify_artists
+                        #         )
+                        #         if match_found:
+                        #             app.logger.info(f"Match found in Jellyfin for track {track.name}. Skipping download.")
+                        #             track.downloaded = True
+                        #             track.filesystem_path = jellyfin_file_path
+                        #             db.session.commit()
+                        #             continue
+                        #         else:
+                        #             app.logger.info(f"No match found in Jellyfin for track {track.name}. Proceeding to download.")
+                        # else:
+                        #     app.logger.warning(f"spotify_track not set, see previous log messages")
                         #endregion
                                 
                     #endregion 
@@ -240,7 +242,7 @@ def check_for_playlist_updates(self):
         try:
             app.logger.info('Starting playlist update check...')
             with app.app_context():
-                playlists = Playlist.query.all()
+                playlists: List[Playlist]     = Playlist.query.all()
                 total_playlists = len(playlists)
                 if not playlists:
                     app.logger.info("No playlists found.")
@@ -251,40 +253,28 @@ def check_for_playlist_updates(self):
 
                 for playlist in playlists:
                     playlist.last_updated = datetime.now( timezone.utc)
-                    sp_playlist = sp.playlist(playlist.provider_playlist_id)
+                    # get the correct MusicProvider from the registry 
+                    provider = MusicProviderRegistry.get_provider(playlist.provider_id)
+                    provider_playlist = provider.get_playlist(playlist.provider_playlist_id)
+                    provider_tracks = provider_playlist.tracks
                     full_update = True
-                    app.logger.info(f'Checking updates for playlist: {playlist.name}, s_snapshot = {sp_playlist['snapshot_id']}')
+                    app.logger.info(f'Checking updates for playlist: {playlist.name}')
                     db.session.commit()
-                    if sp_playlist['snapshot_id'] == playlist.snapshot_id:
-                        app.logger.info(f'playlist: {playlist.name} , no changes detected, snapshot_id {sp_playlist['snapshot_id']}')
-                        full_update = False
+                    
                     try:
                         #region Check for updates
-                        # Fetch all playlist data from Spotify
                         if full_update:
-                            spotify_tracks = {}
-                            offset = 0
-                            playlist.snapshot_id = sp_playlist['snapshot_id']
-                            while True:
-                                playlist_data = sp.playlist_items(playlist.provider_playlist_id, offset=offset, limit=100)
-                                items = playlist_data['items']
-                                spotify_tracks.update({offset + idx: track['track'] for idx, track in enumerate(items) if track['track']})
-                                
-                                if len(items) < 100:  # No more tracks to fetch
-                                    break
-                                offset += 100  # Move to the next batch
-                            
                             existing_tracks = {track.provider_track_id: track for track in playlist.tracks}
 
                             # Determine tracks to add and remove
                             tracks_to_add = []
-                            for idx, track_info in spotify_tracks.items():
+                            for idx, track_info in enumerate(provider_tracks):
                                 if track_info:
-                                    track_id = track_info['id']
+                                    track_id = track_info.track.id
                                     if track_id not in existing_tracks:
-                                        track = Track.query.filter_by(provider_track_id=track_id).first()
+                                        track = Track.query.filter_by(provider_track_id=track_id,provider_id = playlist.provider_id).first()
                                         if not track:
-                                            track = Track(name=track_info['name'], provider_track_id=track_id, provider_uri=track_info['uri'], downloaded=False)
+                                            track = Track(name=track_info.track.name, provider_track_id=track_id, provider_uri=track_info.track.uri, downloaded=False,provider_id = playlist.provider_id)
                                             db.session.add(track)
                                             db.session.commit()
                                             app.logger.info(f'Added new track: {track.name}')
@@ -293,7 +283,7 @@ def check_for_playlist_updates(self):
                             tracks_to_remove = [
                                 existing_tracks[track_id] 
                                 for track_id in existing_tracks 
-                                if track_id not in {track['id'] for track in spotify_tracks.values() if track}
+                                if track_id not in {track.track.id for track in provider_tracks if track}
                             ]
 
                             if tracks_to_add or tracks_to_remove:
@@ -321,7 +311,7 @@ def check_for_playlist_updates(self):
                             #endregion
                         
                         #region Update Playlist Items and Metadata
-                        functions.update_playlist_metadata(playlist, sp_playlist)
+                        functions.update_playlist_metadata(playlist, provider_playlist)
                         ordered_tracks = db.session.execute(
                             db.select(Track, playlist_tracks.c.track_order)
                             .join(playlist_tracks, playlist_tracks.c.track_id == Track.id)
@@ -414,45 +404,47 @@ def update_jellyfin_id_for_downloaded_tracks(self):
 def find_best_match_from_jellyfin(track: Track):
     app.logger.debug(f"Trying to find best match from Jellyfin server for track: {track.name}")
     search_results = jellyfin.search_music_tracks(jellyfin_admin_token, functions.get_longest_substring(track.name))
-    spotify_track = None
+    provider_track = None
     try:
         best_match = None
         best_quality_score = -1  # Initialize with the lowest possible score
-        
-
         for result in search_results:
-            
             app.logger.debug(f"Processing search result: {result['Id']}, Path = {result['Path']}")
             quality_score = compute_quality_score(result, app.config['FIND_BEST_MATCH_USE_FFPROBE'])
             try:
-                spotify_track = functions.get_cached_spotify_track(track.provider_track_id)
-                spotify_track_name = spotify_track['name'].lower()
-                spotify_artists = [artist['name'].lower() for artist in spotify_track['artists']]
+                provider_track = functions.get_cached_provider_track(track.provider_track_id, provider_id=track.provider_id)
+                provider_track_name = provider_track.name.lower()
+                provider_artists = [artist.name.lower() for artist in provider_track.artists]
             except Exception as e:
                 app.logger.error(f"\tError fetching track details from Spotify for {track.name}: {str(e)}")
                 continue
             jellyfin_track_name = result.get('Name', '').lower()
-            jellyfin_artists = [artist.lower() for artist in result.get('Artists', [])]
+            if len(result.get('Artists', [])) == 1:
+                jellyfin_artists = [a.lower() for a in result.get('Artists', [])[0].split('/')]
+            else:
+                jellyfin_artists = [artist.lower() for artist in result.get('Artists', [])]
+            jellyfin_album_artists = [artist['Name'].lower() for artist in result.get('AlbumArtists', [])]
             
-            if spotify_track and jellyfin_track_name and jellyfin_artists and spotify_artists:
+            if provider_track and jellyfin_track_name and jellyfin_artists and provider_artists:
                 app.logger.debug("\tTrack details to compare: ")
                 app.logger.debug(f"\t\tJellyfin-Trackname : {jellyfin_track_name}")
-                app.logger.debug(f"\t\t Spotify-Trackname : {spotify_track_name}")
+                app.logger.debug(f"\t\t Spotify-Trackname : {provider_track_name}")
                 app.logger.debug(f"\t\t  Jellyfin-Artists : {jellyfin_artists}")
-                app.logger.debug(f"\t\t   Spotify-Artists : {spotify_artists}")
+                app.logger.debug(f"\t\t   Spotify-Artists : {provider_artists}")
+                app.logger.debug(f"\t\t  Jellyfin-Alb.Art.: {jellyfin_album_artists}")
                 if len(search_results) == 1:
                     app.logger.debug(f"\tOnly 1 search_result: {result['Id']} ({app.config['JELLYFIN_SERVER_URL']}/web/#/details?id={result['Id']})")
                     
-                    if (spotify_track_name.lower() == jellyfin_track_name and
-                        set(artist.lower() for artist in spotify_artists) == set(jellyfin_artists)):
+                    if (provider_track_name.lower() == jellyfin_track_name and
+                        (set(artist.lower() for artist in provider_artists) == set(jellyfin_artists) or set(jellyfin_album_artists) == set(artist.lower() for artist in provider_artists))):
                         
                         app.logger.debug(f"\tQuality score for track {result['Name']}: {quality_score} [{result['Path']}]")
                         best_match = result
                         break
                 
                 
-                if (spotify_track_name.lower() == jellyfin_track_name and
-                    set(artist.lower() for artist in spotify_artists) == set(jellyfin_artists)):
+                if (provider_track_name.lower() == jellyfin_track_name and
+                    (set(artist.lower() for artist in provider_artists) == set(jellyfin_artists) or set(jellyfin_album_artists) == set(artist.lower() for artist in provider_artists))):
                     app.logger.debug(f"\tQuality score for track {result['Name']}: {quality_score} [{result['Path']}]")
                     
                     if quality_score > best_quality_score:

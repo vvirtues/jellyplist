@@ -35,6 +35,7 @@ class Playlist(db.Model):
     snapshot_id = db.Column(db.String(120), nullable=True)
     # Many-to-Many relationship with JellyfinUser
     users = db.relationship('JellyfinUser', secondary=user_playlists, back_populates='playlists')
+    provider_id = db.Column(db.String(20))
 
     def __repr__(self):
         return f'<Playlist {self.name}:{self.provider_playlist_id}>'
@@ -56,6 +57,7 @@ class Track(db.Model):
     filesystem_path = db.Column(db.String(), nullable=True)
     jellyfin_id = db.Column(db.String(120), nullable=True)  # Add Jellyfin track ID field
     download_status = db.Column(db.String(2048), nullable=True)
+    provider_id = db.Column(db.String(20))
 
     # Many-to-Many relationship with Playlists
     playlists = db.relationship('Playlist', secondary=playlist_tracks, back_populates='tracks')
