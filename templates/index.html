@@ -2,5 +2,36 @@
 
 {% block content %}
 
+<div class="container h-100">
+    <div class="d-flex justify-content-center h-100">
+      <div class="searchbar">
+        <!-- Form element with HTMX attributes -->
+        <form method="GET" action="/playlist/open" >
+          <input 
+            class="search_input" 
+            type="text" 
+            name="playlist" 
+            placeholder="Paste a Playlist ID or a complete link to a playlist"
+            required
+          >
+          <button type="submit" class="search_icon">
+            <i class="fas fa-search"></i>
+          </button>
+        </form>
+        {% if error_message %}
+  <div class="alert alert-danger mt-5" role="alert">
+      <h4 class="alert-heading">🚨Cant fetch playlist🚨</h4>
+      <p>{{ error_message }}</p>
+      <hr>
+      <p>Additional Information:</p>
+      <p>{{error_data}}</p>
+      
+  </div>
+{% endif %}
+      </div>
+    </div>
+    
+</div>
+
 
 {% endblock %}
