@@ -1,0 +1,23 @@
+<div class="modal-header">
+    <h5 class="modal-title" id="trackDetailsModalLabel">Track Details</h5>
+    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+</div>
+<div class="modal-body">
+    <p><strong>Title:</strong> {{ track.title }}</p>
+    <p><strong>Artist:</strong> {{ track.artist }}</p>
+    <p><strong>Duration:</strong> {{ track.duration }}</p>
+    <p><strong>Duration (ms):</strong> {{ track.duration_ms }}</p>
+    <p><strong>Provider:</strong> {{ track.provider_id }}</p>
+    <p><strong>Provider Track URL:</strong> <a href="{{track.provider_track_url}}" target="_blank">{{track.provider_track_url}}</a></p>
+    <!-- <p><strong>Preview URL:</strong> <a href="{{ track.preview_url }}" target="_blank">{{ track.preview_url if track.preview_url else 'No Preview Available' }}</a></p> -->
+    <p><strong>Status:</strong> {{ 'Downloaded' if track.downloaded else 'Not Downloaded' }}</p>
+    <p><strong>Jellyfin ID:</strong> {{ track.jellyfin_id | jellyfin_link }}</p>
+    <p><strong>Provider Track ID:</strong> {{ track.provider_track_id }}</p>
+    <p><strong>Download Status:</strong> {{ track.download_status }}</p>
+    <p><strong>Filesystem Path:</strong> {{ track.filesystem_path }}</p>
+    <p><strong>Jellyfin Filesystem Path:</strong> {{ track.jellyfin_filesystem_path if track.jellyfin_filesystem_path else 'N/A' }}</p>
+    <p>{{ track.jellyfin_filesystem_path | audioprofile(track.jellyfin_filesystem_path) if track.jellyfin_filesystem_path else 'N/A' }}</p>
+</div>
+<div class="modal-footer">
+    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+</div>

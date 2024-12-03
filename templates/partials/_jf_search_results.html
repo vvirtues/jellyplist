@@ -31,7 +31,7 @@
             </button>
           </td>
           <td>
-            <button hx-swap="beforebegin" class="btn btn-sm btn-success" hx-post="/associate_track" hx-vals='{"jellyfin_id": "{{ track.Id }}","spotify_id": "{{ spotify_id}}"}' data-bs-toggle="tooltip" title="Link this Track [{{track.Id}}] with Spotify-Track-ID {{ spotify_id }}">
+            <button hx-swap="beforebegin" class="btn btn-sm btn-success" hx-post="/associate_track" hx-vals='{"jellyfin_id": "{{ track.Id }}","provider_track_id": "{{ provider_track_id}}"}' data-bs-toggle="tooltip" title="Link this Track [{{track.Id}}] with Provider-Track-ID {{ provider_track_id }}">
               Link Track
             </button>
           </td>

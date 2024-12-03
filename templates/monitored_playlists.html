@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container-fluid">
+  {% for provider_id, playlists in provider_playlists_data.items() %}
+  <div class="provider-section mb-5">
+    <h2>{{ provider_id }}</h2>
+    <div class="row row-cols-2 row-cols-md-6 g-4">
+      {% for item in playlists %}
+      {% include 'partials/playlist_item.html' %}
+      {% endfor %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

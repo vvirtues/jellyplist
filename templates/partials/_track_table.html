@@ -1,75 +1,98 @@
 <table class="table">
-    <thead>
-      <tr>
-        <th scope="col">#</th>
-        <th scope="col">Title</th>
-        <th scope="col">Artist</th>
-        <th scope="col">Duration</th>
-        <th scope="col">Spotify</th>
-        <th scope="col">Preview</th>
-        <th scope="col">Status</th>
-        <th scope="col">Jellyfin</th> 
-      </tr>
-    </thead>
-    <tbody>
-      {% for track in tracks %}
-      <tr>
-        <th scope="row">{{ loop.index }}</th>
-        <td>{{ track.title }}</td>
-        <td>{{ track.artist }}</td>
-        <td>{{ track.duration }}</td>
-        <td>
-          <a href="{{ track.url }}" target="_blank" class="text-success" data-bs-toggle="tooltip" title="Open in Spotify">
-            <i class="fab fa-spotify fa-lg"></i>
-          </a>
-        </td>
-        <td>
-          {% if track.preview_url %}
-          <button class="btn btn-sm btn-primary" onclick="playPreview(this, '{{ track.preview_url }}')" data-bs-toggle="tooltip" title="Play Preview">
-            <i class="fas fa-play"></i>
-          </button>
-          {% else %}
-          <span data-bs-toggle="tooltip" title="No Preview Available">
-            <button class="btn btn-sm" disabled><i class="fas fa-ban"></i></button>
-          </span>
-          {% endif %}
-        </td>
-        <td>
-          {% if not track.downloaded %}
-            <button class="btn btn-sm btn-danger" 
-            data-bs-toggle="tooltip" title="{{ track.download_status if track.download_status else 'Not downloaded'}}">
-            <i class="fa-solid fa-triangle-exclamation"></i>
-          </button>
-          {% else %}
-          <button class="btn btn-sm btn-success" data-bs-toggle="tooltip" title="Track downloaded">
-            <i class="fa-solid fa-circle-check"></i>
-          </button>
-          {% endif %}
-        </td>
-        <td>
-          {% set title = track.title | replace("'","") %}
+  <thead>
+    <tr>
+      <th scope="col">#</th>
+      <th scope="col">Title</th>
+      <th scope="col">Artist</th>
+      <th scope="col">Duration</th>
+      <th scope="col">{{provider_id}}</th>
+      <th scope="col">Preview</th>
+      <th scope="col">Status</th>
+      <th scope="col">Jellyfin</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for track in tracks %}
+    <tr hx-get="/track_details/{{track.provider_track_id}}?provider={{ provider_id }}"
+      hx-target="#trackDetailsModalcontent" hx-trigger="dblclick" hx-on="htmx:afterOnLoad:showModal">
+      <th scope="row">{{ loop.index }}</th>
+      <td>{{ track.title }}</td>
+      <td>{{ track.artist }}</td>
+      <td>{{ track.duration }}</td>
+      <td>
+        <a href="{{ track.url[0]  }}" target="_blank" class="text-success" data-bs-toggle="tooltip"
+          title="Open in {{ track.provider_id }}">
+          <i class="fab fa-{{ track.provider_id.lower() }} fa-lg"></i>
+        </a>
+      </td>
+      <td>
+        {% if track.preview_url %}
+        <button class="btn btn-sm btn-primary" onclick="playPreview(this, '{{ track.preview_url }}')"
+          data-bs-toggle="tooltip" title="Play Preview">
+          <i class="fas fa-play"></i>
+        </button>
+        {% else %}
+        <span data-bs-toggle="tooltip" title="No Preview Available">
+          <button class="btn btn-sm" disabled><i class="fas fa-ban"></i></button>
+        </span>
+        {% endif %}
+      </td>
+      <td>
+        {% if not track.downloaded %}
+        <button class="btn btn-sm btn-danger" data-bs-toggle="tooltip"
+          title="{{ track.download_status if track.download_status else 'Not downloaded'}}">
+          <i class="fa-solid fa-triangle-exclamation"></i>
+        </button>
+        {% else %}
+        <button class="btn btn-sm btn-success" data-bs-toggle="tooltip" title="Downloaded">
+          <i class="fa-solid fa-check"></i>
+        </button>
+        {% endif %}
+      </td>
+      <td>
+        {% set title = track.title | replace("'","") %}
 
-          {% if track.jellyfin_id %}
-          <button class="btn btn-sm btn-success" onclick="handleJellyfinClick(event, '{{ track.jellyfin_id }}', '{{ title }}', '{{ track.spotify_id }}')" data-bs-toggle="tooltip" title="Play from Jellyfin (Hold CTRL Key to reassing a new track)">
-            <i class="fas fa-play"></i>
+        {% if track.jellyfin_id %}
+        <button class="btn btn-sm btn-success"
+          onclick="handleJellyfinClick(event, '{{ track.jellyfin_id }}', '{{ title }}', '{{ track.provider_track_id }}')"
+          data-bs-toggle="tooltip" title="Play from Jellyfin (Hold CTRL Key to reassing a new track)">
+          <i class="fas fa-play"></i>
+        </button>
+        {% elif track.downloaded %}
+        <span data-bs-toggle="tooltip"
+          title="Track Downloaded, but not in Jellyfin or could not be associated automatically. You can try to do the association manually">
+          <button class="btn btn-sm btn-warning"
+            onclick="openSearchModal('{{ title  }}','{{track.provider_track_id}}')">
+            <i class="fas fa-triangle-exclamation"></i>
           </button>
-          {% elif track.downloaded %}
-          <span data-bs-toggle="tooltip" title="Track Downloaded, but not in Jellyfin or could not be associated automatically. You can try to do the association manually">
-            <button class="btn btn-sm btn-warning" onclick="openSearchModal('{{ title  }}','{{track.spotify_id}}')">
-              <i class="fas fa-triangle-exclamation"></i>
-            </button>
-          </span>
-          {% else %}
-          <span data-bs-toggle="tooltip" title="Not Available">
-            <button class="btn btn-sm" disabled><i class="fas fa-ban"></i></button>
-          </span>
-          {% endif %}
-        </td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+        </span>
+        {% else %}
+        <span>
+          <button class="btn btn-sm" onclick="openSearchModal('{{ title  }}','{{track.provider_track_id}}')"
+            data-bs-toggle="tooltip" title="Hold CTRL Key to reassing a new track"><i class="fas fa-ban"></i></button>
+        </span>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<div class="modal fade" id="trackDetailsModal" tabindex="-1" aria-labelledby="trackDetailsModalLabel"
+  aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content" id="trackDetailsModalcontent">
+    </div>
+  </div>
 </div>
+<script>
+  document.addEventListener('htmx:afterOnLoad', function(event) {
+    if (event.detail.target.id === 'trackDetailsModalcontent') {
+      const modal = new bootstrap.Modal(document.getElementById('trackDetailsModal'));
+      modal.show();
+    }
+  });
+</script>
 <div class="modal fade" id="searchModal" tabindex="-1" aria-labelledby="searchModalLabel" aria-hidden="true">
   <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
     <div class="modal-content">
@@ -81,8 +104,9 @@
         <!-- htmx-enabled form -->
         <form id="search-form" hx-get="/search_jellyfin" hx-target="#search-results" hx-trigger="submit">
           <div class="input-group mb-3">
-            <input type="text" class="form-control" id="search-query" name="search_query" placeholder="Search for a track...">
-            <input type="hidden" class="form-control" id="spotify-id" name="spotify_id" >
+            <input type="text" class="form-control" id="search-query" name="search_query"
+              placeholder="Search for a track...">
+            <input type="hidden" class="form-control" id="provider-track-id" name="provider_track_id">
             <button class="btn btn-primary" type="submit">Search</button>
           </div>
         </form>
@@ -93,10 +117,8 @@
             </div>
           </div>
         </div>
-        
+
       </div>
     </div>
   </div>
 </div>
-
-
