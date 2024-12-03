@@ -61,5 +61,6 @@ class Track(db.Model):
 
     # Many-to-Many relationship with Playlists
     playlists = db.relationship('Playlist', secondary=playlist_tracks, back_populates='tracks')
+    lidarr_processed = db.Column(db.Boolean(), default=False)
     def __repr__(self):
         return f'<Track {self.name}:{self.provider_track_id}>'

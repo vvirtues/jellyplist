@@ -4,7 +4,7 @@ import subprocess
 from typing import List
 
 from sqlalchemy import insert
-from app import celery, app, db, functions, sp, jellyfin, jellyfin_admin_token, jellyfin_admin_id
+from app import celery, app, db, functions, sp, jellyfin, jellyfin_admin_token, jellyfin_admin_id, redis_client
 
 from app.classes import AudioProfile
 from app.models import JellyfinUser,Playlist,Track, user_playlists, playlist_tracks
@@ -12,9 +12,10 @@ import os
 import redis
 from celery import current_task,signals
 
+from app.providers import base
 from app.registry.music_provider_registry import MusicProviderRegistry
+from lidarr.classes import Artist
 
-redis_client = redis.StrictRedis(host='redis', port=6379, db=0)
 def acquire_lock(lock_name, expiration=60):
     return redis_client.set(lock_name, "locked", ex=expiration, nx=True)
 
@@ -397,6 +398,94 @@ def update_jellyfin_id_for_downloaded_tracks(self):
 
         finally:
             release_lock(lock_key)
+    else:
+        app.logger.info("Skipping task. Another instance is already running.")
+        return {'status': 'Task skipped, another instance is running'}
+
+@celery.task(bind=True)
+def request_lidarr(self):
+    lock_key = "request_lidarr_lock"
+    
+    if acquire_lock(lock_key, expiration=600):  
+        with app.app_context():
+            if app.config['LIDARR_API_KEY'] and app.config['LIDARR_URL']:
+                from app import lidarr_client
+                try:
+                    app.logger.info('Submitting request to Lidarr...')
+                    # get all tracks from db
+                    tracks = Track.query.filter_by(lidarr_processed=False).all()
+                    total_items = len(tracks)
+                    processed_items = 0
+                    for track in tracks:
+                        tfp = functions.get_cached_provider_track(track.provider_track_id, provider_id=track.provider_id)
+                        if tfp:                            
+                            if app.config['LIDARR_MONITOR_ARTISTS']:
+                                app.logger.debug("Monitoring artists instead of albums")
+                                # get all artists from all tracks_from_provider and unique them
+                                artists : dict[str,base.Artist] = {}
+                                
+                                for artist in tfp.artists:
+                                    artists[artist.name] = artist
+                                app.logger.debug(f"Found {len(artists)} artists to monitor")
+                                #pylint: disable=consider-using-dict-items
+                                for artist in artists:
+                                    artist_from_lidarr = None
+                                    search_result = lidarr_client.search(artists[artist].name)
+                                    for url in artists[artist].external_urls:
+                                        artist_from_lidarr : Artist = lidarr_client.get_object_by_external_url(search_result, url.url)
+                                        if artist_from_lidarr:
+                                            app.logger.debug(f"Found artist {artist_from_lidarr.artistName} by external url {url.url}")
+                                            functions.apply_default_profile_and_root_folder(artist_from_lidarr)
+                                            try:
+                                                lidarr_client.monitor_artist(artist_from_lidarr)
+                                                track.lidarr_processed = True
+                                                db.session.commit()
+                                            except Exception as e:
+                                                app.logger.error(f"Error monitoring artist {artist_from_lidarr.artistName}: {str(e)}")
+                                                
+                                    if not artist_from_lidarr:
+                                        # if the artist isnt found by the external url, search by name
+                                        artist_from_lidarr = lidarr_client.get_artists_by_name(search_result, artists[artist].name)
+                                        for artist2 in artist_from_lidarr:
+                                            functions.apply_default_profile_and_root_folder(artist2)
+                                            try:
+                                                lidarr_client.monitor_artist(artist2)
+                                                track.lidarr_processed = True
+                                                db.session.commit()
+                                            except Exception as e:
+                                                app.logger.error(f"Error monitoring artist {artist2.artistName}: {str(e)}")
+                                                
+                                    processed_items += 1
+                                    self.update_state(state=f'{processed_items}/{total_items}: {artist}', meta={'current': processed_items, 'total': total_items, 'percent': (processed_items / total_items) * 100})
+
+                            else:
+                                if tfp.album:
+                                    album_from_lidarr = None
+                                    search_result = lidarr_client.search(tfp.album.name)
+                                    # if the album isnt found by the external url, search by name
+                                    album_from_lidarr = lidarr_client.get_albums_by_name(search_result, tfp.album.name)
+                                    for album2 in album_from_lidarr:
+                                        functions.apply_default_profile_and_root_folder(album2.artist)
+                                        try:
+                                            lidarr_client.monitor_album(album2)
+                                            track.lidarr_processed = True
+                                            db.session.commit()
+                                        except Exception as e:
+                                            app.logger.error(f"Error monitoring album {album2.title}: {str(e)}")
+                                    processed_items += 1
+                                    self.update_state(state=f'{processed_items}/{total_items}: {tfp.album.name}', meta={'current': processed_items, 'total': total_items, 'percent': (processed_items / total_items) * 100})
+
+
+                    app.logger.info(f'Requests sent to Lidarr. Total items: {total_items}')
+                    return {'status': 'Request sent to Lidarr'}
+                finally:
+                    release_lock(lock_key)
+    
+            else:
+                app.logger.info('Lidarr API key or URL not set. Skipping request.')
+                release_lock(lock_key)
+            
+                
     else:
         app.logger.info("Skipping task. Another instance is already running.")
         return {'status': 'Task skipped, another instance is running'}

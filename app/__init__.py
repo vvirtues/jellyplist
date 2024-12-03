@@ -8,6 +8,7 @@ from flask import Flask, has_request_context
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from psycopg2 import OperationalError
+import redis
 import spotipy
 from spotipy.oauth2 import  SpotifyClientCredentials
 from celery import Celery
@@ -77,9 +78,13 @@ def make_celery(app):
         'update_jellyfin_id_for_downloaded_tracks-schedule': {
             'task': 'app.tasks.update_jellyfin_id_for_downloaded_tracks',
             'schedule': crontab(minute='*/10'),  
-            
         }
     }
+    if app.config['LIDARR_API_KEY']:
+        celery.conf.beat_schedule['request-lidarr-schedule'] = {
+            'task': 'app.tasks.request_lidarr',
+            'schedule': crontab(minute='*/15')
+        }
     
     celery.conf.timezone = 'UTC'
     return celery
@@ -89,17 +94,6 @@ device_id = f'JellyPlist_{'_'.join(sys.argv)}'
 
 # Initialize Flask app
 app = Flask(__name__, template_folder="../templates", static_folder='../static')
-# log_file = 'app.log'
-# handler = RotatingFileHandler(log_file, maxBytes=100000, backupCount=3)
-# handler.setLevel(logging.DEBUG)
-# handler.setFormatter(log_formatter)
-# stream_handler = logging.StreamHandler(sys.stdout)
-# stream_handler.setLevel(logging.DEBUG)
-# stream_handler.setFormatter(log_formatter)
-
-
-# # app.logger.addHandler(handler)
-# app.logger.addHandler(stream_handler)
 
 
 app.config.from_object(Config)
@@ -114,6 +108,7 @@ logging.basicConfig(format=FORMAT)
 
 Config.validate_env_vars()
 cache = Cache(app)
+redis_client = redis.StrictRedis(host=app.config['CACHE_REDIS_HOST'], port=app.config['CACHE_REDIS_PORT'], db=0, decode_responses=True)
 
 
 # Spotify, Jellyfin, and Spotdl setup
@@ -181,3 +176,8 @@ spotify_client = SpotifyClient('/jellyplist/open.spotify.com_cookies.txt')
 spotify_client.authenticate()
 from .registry import MusicProviderRegistry
 MusicProviderRegistry.register_provider(spotify_client)
+
+if app.config['LIDARR_API_KEY'] and app.config['LIDARR_URL']:
+    app.logger.info(f'Creating Lidarr Client with URL: {app.config["LIDARR_URL"]}')
+    from lidarr.client import LidarrClient
+    lidarr_client = LidarrClient(app.config['LIDARR_URL'], app.config['LIDARR_API_KEY'])

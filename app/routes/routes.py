@@ -1,8 +1,9 @@
+from dbm import error
 import json
 import os
 import re
 from flask import Flask, Response, jsonify, render_template, request, redirect, url_for, session, flash, Blueprint, g
-from app import app, db, functions, sp, jellyfin, celery, jellyfin_admin_token, jellyfin_admin_id,device_id,  cache, read_dev_build_file, tasks
+from app import app, db, functions, jellyfin, read_dev_build_file, tasks
 from app.classes import AudioProfile, CombinedPlaylistData
 from app.models import JellyfinUser,Playlist,Track
 from celery.result import AsyncResult
@@ -12,6 +13,8 @@ from app.providers import base
 from app.providers.base import MusicProviderClient
 from app.providers.spotify import SpotifyClient
 from app.registry.music_provider_registry import MusicProviderRegistry
+from lidarr.classes import Album, Artist
+from lidarr.client import LidarrClient
 from ..version import __version__
 from spotipy.exceptions import SpotifyException
 from collections import defaultdict
@@ -37,6 +40,29 @@ def render_messages(response: Response) -> Response:
     return response
 
 
+@app.route('/admin/lidarr')
+@functions.jellyfin_admin_required
+def admin_lidarr():
+    if app.config['LIDARR_API_KEY'] and app.config['LIDARR_URL']:
+        from app import lidarr_client
+        q_profiles = lidarr_client.get_quality_profiles()
+        root_folders = lidarr_client.get_root_folders()
+        return render_template('admin/lidarr.html',quality_profiles = q_profiles, root_folders = root_folders, current_quality_profile = functions.lidarr_quality_profile_id(), current_root_folder = functions.lidarr_root_folder_path())
+    return render_template('admin/lidarr.html', error = 'Lidarr not configured')
+
+@app.route('/admin/lidarr/save', methods=['POST'])
+@functions.jellyfin_admin_required
+def save_lidarr_config():
+    quality_profile_id = request.form.get('qualityProfile')
+    root_folder_id = request.form.get('rootFolder')
+
+    if not quality_profile_id or not root_folder_id:
+        flash('Both Quality Profile and Root Folder must be selected', 'danger')
+        return redirect(url_for('admin_lidarr'))
+    functions.lidarr_quality_profile_id(quality_profile_id)
+    functions.lidarr_root_folder_path(root_folder_id)
+    flash('Configuration saved successfully', 'success')
+    return redirect(url_for('admin_lidarr'))
 
 @app.route('/admin/tasks')
 @functions.jellyfin_admin_required
@@ -370,43 +396,5 @@ def unlock_key():
 
 @pl_bp.route('/test')
 def test():
-    #return '' 
-    app.logger.info(f"performing full update on jellyfin track ids. (Update tracks and playlists if better quality will be found)")
-    downloaded_tracks : List[Track] = Track.query.all()
-    total_tracks = len(downloaded_tracks)
-    if not downloaded_tracks:
-        app.logger.info("No downloaded tracks without Jellyfin ID found.")
-        return {'status': 'No tracks to update'}
-
-    app.logger.info(f"Found {total_tracks} tracks to update ")
-    processed_tracks = 0
-
-    for track in downloaded_tracks:
-        try:
-            best_match = tasks.find_best_match_from_jellyfin(track)
-            if best_match:
-                track.downloaded = True
-                if track.jellyfin_id != best_match['Id']:
-                    track.jellyfin_id = best_match['Id']
-                    app.logger.info(f"Updated Jellyfin ID for track: {track.name} ({track.provider_track_id})")
-                if track.filesystem_path != best_match['Path']:
-                    track.filesystem_path = best_match['Path']
-                    app.logger.info(f"Updated filesystem_path for track: {track.name} ({track.provider_track_id})")
-                    
-                    
-                
-                db.session.commit()
-            else:
-                app.logger.warning(f"No matching track found in Jellyfin for {track.name}.")
-            
-            spotify_track = None
-            
-        except Exception as e:
-            app.logger.error(f"Error searching Jellyfin for track {track.name}: {str(e)}")
-
-        processed_tracks += 1
-        progress = (processed_tracks / total_tracks) * 100
-        #self.update_state(state=f'{processed_tracks}/{total_tracks}: {track.name}', meta={'current': processed_tracks, 'total': total_tracks, 'percent': progress})
-
-    app.logger.info("Finished updating Jellyfin IDs for all tracks.")
-    return {'status': 'All tracks updated', 'total': total_tracks, 'processed': processed_tracks}
+    return '' 
+    

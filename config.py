@@ -27,6 +27,10 @@ class Config:
     SEARCH_JELLYFIN_BEFORE_DOWNLOAD = os.getenv('SEARCH_JELLYFIN_BEFORE_DOWNLOAD',"true").lower() == 'true'
     FIND_BEST_MATCH_USE_FFPROBE = os.getenv('FIND_BEST_MATCH_USE_FFPROBE','false').lower() == 'true'
     SPOTIFY_COUNTRY_CODE = os.getenv('SPOTIFY_COUNTRY_CODE','DE')
+    LIDARR_API_KEY = os.getenv('LIDARR_API_KEY','') 
+    LIDARR_URL = os.getenv('LIDARR_URL','')
+    LIDARR_MONITOR_ARTISTS = os.getenv('LIDARR_MONITOR_ARTISTS','false').lower() == 'true'
+    
     # SpotDL specific configuration
     SPOTDL_CONFIG = {
         'cookie_file': '/jellyplist/cookies.txt',

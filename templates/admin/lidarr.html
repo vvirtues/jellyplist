@@ -1,0 +1,32 @@
+{% extends "admin.html" %}
+
+{% block admin_content %}
+<div class="container mt-5">
+    <h1>Lidarr Configuration</h1>
+    {% if error %}
+        <div class="alert alert-danger" role="alert">
+            {{ error }}
+        </div>
+    {% else %}
+        <form id="lidarrConfigForm" method="POST" action="{{ url_for('save_lidarr_config') }}">
+            <div class="mb-3">
+                <label for="qualityProfile" class="form-label">Default Quality Profile</label>
+                <select class="form-select" id="qualityProfile" name="qualityProfile" required>
+                    {% for profile in quality_profiles %}
+                        <option value="{{ profile.id }}" {% if profile.id == current_quality_profile|int %}selected{% endif %}>{{ profile.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="mb-3">
+                <label for="rootFolder" class="form-label">Default Root Folder</label>
+                <select class="form-select" id="rootFolder" name="rootFolder" required>
+                    {% for folder in root_folders %}
+                        <option value="{{ folder.path }}" {% if folder.path == current_root_folder %}selected{% endif %}>{{ folder.path }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <button type="submit" class="btn btn-primary">Save</button>
+        </form>
+    {% endif %}
+</div>
+{% endblock %}

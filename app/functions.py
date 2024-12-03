@@ -4,12 +4,13 @@ from flask import flash, redirect, session, url_for,g
 import requests
 from app.classes import CombinedPlaylistData, CombinedTrackData
 from app.models import JellyfinUser, Playlist,Track  
-from app import  sp, cache, app, jellyfin  ,jellyfin_admin_token, jellyfin_admin_id,device_id, cache
+from app import  sp, cache, app, jellyfin  ,jellyfin_admin_token, jellyfin_admin_id,device_id, cache, redis_client
 from functools import  wraps
 from celery.result import AsyncResult
 from app.providers import base
 from app.providers.base import PlaylistTrack
 from app.registry.music_provider_registry import MusicProviderRegistry
+from lidarr.classes import Album, Artist
 from . import tasks
 from jellyfin.objects import PlaylistMetadata
 from spotipy.exceptions import SpotifyException
@@ -20,15 +21,20 @@ TASK_STATUS = {
     'update_all_playlists_track_status': None,
     'download_missing_tracks': None,
     'check_for_playlist_updates': None,
-    'update_jellyfin_id_for_downloaded_tracks' : None
+    'update_jellyfin_id_for_downloaded_tracks' : None,
+    
+    
 }
+if app.config['LIDARR_API_KEY']:
+    TASK_STATUS['request_lidarr'] = None
+    
 LOCK_KEYS = [
     'update_all_playlists_track_status_lock',    
     'download_missing_tracks_lock',
     'check_for_playlist_updates_lock',
     'update_jellyfin_id_for_downloaded_tracks_lock' ,
-    'full_update_jellyfin_ids' 
-
+    'full_update_jellyfin_ids',
+    'request_lidarr_lock'
 ]
 
 def manage_task(task_name):
@@ -46,6 +52,8 @@ def manage_task(task_name):
         result = tasks.check_for_playlist_updates.delay()
     elif task_name == 'update_jellyfin_id_for_downloaded_tracks':
         result = tasks.update_jellyfin_id_for_downloaded_tracks.delay()
+    elif task_name == 'request_lidarr':
+        result = tasks.request_lidarr.delay()
 
     TASK_STATUS[task_name] = result.id  
     return result.state, result.info if result.info else {}
@@ -93,6 +101,41 @@ def prepPlaylistData(playlist: base.Playlist) -> Optional[CombinedPlaylistData]:
         status=status
     )
 
+def lidarr_quality_profile_id(profile_id=None):
+    if app.config['LIDARR_API_KEY'] and app.config['LIDARR_URL']:
+        from app import lidarr_client    
+        if profile_id:
+            redis_client.set('lidarr_quality_profile_id', profile_id)
+        else:
+            value = redis_client.get('lidarr_quality_profile_id')
+            if not value:
+                value = lidarr_client.get_quality_profiles()[0]
+                lidarr_quality_profile_id(value.id)
+                return value
+            return value
+
+def lidarr_root_folder_path(folder_path=None):
+    if app.config['LIDARR_API_KEY'] and app.config['LIDARR_URL']:
+        from app import lidarr_client   
+        if folder_path:
+            redis_client.set('lidarr_root_folder_path', folder_path)
+        else:
+            value = redis_client.get('lidarr_root_folder_path')
+            if not value:
+                value = lidarr_client.get_root_folders()[0]
+                lidarr_root_folder_path(value.path)
+                return value.path
+            return value
+            
+# a function which takes a lidarr.class.Artist object as a parameter, and applies the lidarr_quality_profile_id to the artist if its 0
+def apply_default_profile_and_root_folder(object : Artist ) -> Artist:
+    if object.qualityProfileId == 0:
+        object.qualityProfileId = int(lidarr_quality_profile_id())
+    if object.rootFolderPath == '' or object.rootFolderPath == None:
+        object.rootFolderPath = str(lidarr_root_folder_path())
+    if object.metadataProfileId == 0:
+        object.metadataProfileId = 1
+    return object
 
 @cache.memoize(timeout=3600*24*10) 
 def get_cached_provider_track(track_id : str,provider_id : str)-> base.Track:
