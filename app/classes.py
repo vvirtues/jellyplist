@@ -1,7 +1,9 @@
+from dataclasses import dataclass
+from datetime import datetime
 import subprocess
 import json
 from flask import current_app as app  # Adjust this based on your app's structure
-from typing import Optional
+from typing import List, Optional
 
 
 class AudioProfile:
@@ -77,3 +79,38 @@ class AudioProfile:
         """
         return (f"AudioProfile(path='{self.path}', bitrate={self.bitrate} kbps, "
                 f"sample_rate={self.sample_rate} Hz, channels={self.channels})")
+
+
+@dataclass
+class CombinedTrackData():
+    # Combines a track from a provider with a track from the db
+    title: str
+    artist: List[str]
+    url: List[str]
+    duration: str
+    downloaded: bool
+    filesystem_path: Optional[str]
+    jellyfin_id: Optional[str]
+    provider_id: str
+    provider_track_id: str
+    duration_ms: int
+    download_status: Optional[str]
+    provider: str
+    
+@dataclass
+class CombinedPlaylistData():
+    name: str
+    description: Optional[str]
+    image: str
+    url: str
+    id: str
+    jellyfin_id: Optional[str]
+    can_add: bool
+    can_remove: bool
+    last_updated: Optional[datetime]
+    last_changed: Optional[datetime]
+    tracks_available: int
+    track_count: int
+    tracks_linked: int
+    percent_available: float
+    status: str
