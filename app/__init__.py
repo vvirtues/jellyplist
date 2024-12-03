@@ -172,7 +172,15 @@ for name, func in filters.filters.items():
     
     
 from .providers import SpotifyClient
-spotify_client = SpotifyClient('/jellyplist/open.spotify.com_cookies.txt')
+if app.config['SPOTIFY_COOKIE_FILE']:
+    if os.path.exists(app.config['SPOTIFY_COOKIE_FILE']):
+        spotify_client = SpotifyClient(app.config['SPOTIFY_COOKIE_FILE'])
+    else:
+        app.logger.error(f"Cookie file {app.config['SPOTIFY_COOKIE_FILE']} does not exist. Exiting.")
+        sys.exit(1)
+else:
+    spotify_client = SpotifyClient()
+    
 spotify_client.authenticate()
 from .registry import MusicProviderRegistry
 MusicProviderRegistry.register_provider(spotify_client)
