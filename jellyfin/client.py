@@ -315,6 +315,18 @@ class JellyfinClient:
             return {"status": "success", "message": "Playlist removed successfully"}
         else:
             raise Exception(f"Failed to remove playlist: {response.content}")
+    
+    def get_item(self, session_token: str, item_id: str):
+        url = f'{self.base_url}/Items/{item_id}'
+        self.logger.debug(f"Url={url}")
+        
+        response = requests.get(url, headers=self._get_headers(session_token=session_token), timeout = self.timeout)
+        self.logger.debug(f"Response = {response.status_code}")
+        
+        if response.status_code == 200:
+            return response.json()
+        else:
+            raise Exception(f"Failed to get item: {response.content}")
         
     def remove_user_from_playlist(self, session_token: str, playlist_id: str, user_id: str):
         """
@@ -341,7 +353,7 @@ class JellyfinClient:
             raise Exception(f"Failed to remove user from playlist: {response.content}")
     
 
-    def set_playlist_cover_image(self, session_token: str, playlist_id: str, spotify_image_url: str):
+    def set_playlist_cover_image(self, session_token: str, playlist_id: str, provider_image_url: str):
         """
         Set the cover image of a playlist in Jellyfin using an image URL from Spotify.
         
@@ -351,7 +363,7 @@ class JellyfinClient:
         :return: Success message or raises an exception on failure.
         """
         # Step 1: Download the image from the Spotify URL
-        response = requests.get(spotify_image_url, timeout = self.timeout)
+        response = requests.get(provider_image_url, timeout = self.timeout)
         
         if response.status_code != 200:
             raise Exception(f"Failed to download image from Spotify: {response.content}")
@@ -443,7 +455,6 @@ class JellyfinClient:
             raise Exception(f"Failed to fetch playlist metadata: {response.content}")
     
         return response.json()
-    
     
     def search_track_in_jellyfin(self, session_token: str, preview_url: str, song_name: str, artist_names: list):
         """
@@ -545,8 +556,6 @@ class JellyfinClient:
             # Log the error (assuming you have a logging mechanism)
             print(f"Error in search_track_in_jellyfin: {str(e)}")
             return False, None
-
-
 
     # Helper methods used in search_track_in_jellyfin
     def download_preview_to_tempfile(self, preview_url):
