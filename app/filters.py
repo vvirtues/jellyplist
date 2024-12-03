@@ -3,6 +3,7 @@ import re
 from markupsafe import Markup
 
 from app.classes import AudioProfile
+from app import app
 
 filters = {}
 
@@ -50,6 +51,17 @@ def audioprofile(text: str, path: str) -> Markup:
         f"<strong>Sample Rate:</strong> {audio_profile.sample_rate} Hz<br>"
         f"<strong>Channels:</strong> {audio_profile.channels}<br>"
         f"<strong>Quality Score:</strong> {audio_profile.compute_quality_score()}"
-        f"</div>"
+        
     )
     return Markup(audio_profile_html)
+
+
+@template_filter('jellyfin_link')
+def jellyfin_link(jellyfin_id: str) -> Markup:
+
+    jellyfin_server_url = app.config.get('JELLYFIN_SERVER_URL')
+    if not jellyfin_server_url:
+        return Markup(f"<span style='color: red;'>JELLYFIN_SERVER_URL not configured</span>")
+
+    link = f"{jellyfin_server_url}/web/#/details?id={jellyfin_id}"
+    return Markup(f'<a href="{link}" target="_blank">{jellyfin_id}</a>')
