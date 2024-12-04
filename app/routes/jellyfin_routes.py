@@ -5,7 +5,7 @@ from sqlalchemy import insert
 from app import app, db,  jellyfin, functions, device_id,sp
 from app.models import JellyfinUser, Playlist,Track,  playlist_tracks
 from spotipy.exceptions import SpotifyException
-
+from app.tasks import task_manager
 
 from app.registry.music_provider_registry import MusicProviderRegistry
 from jellyfin.objects import PlaylistMetadata
@@ -73,7 +73,7 @@ def add_playlist():
             db.session.add(playlist)
             db.session.commit()
             if app.config['START_DOWNLOAD_AFTER_PLAYLIST_ADD']:
-                functions.manage_task('download_missing_tracks')
+                task_manager.start_task('download_missing_tracks')
         # Get the logged-in user
         user : JellyfinUser = functions._get_logged_in_user()
         playlist.tracks_available = 0
