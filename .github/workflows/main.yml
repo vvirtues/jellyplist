@@ -37,6 +37,7 @@ jobs:
         uses: docker/build-push-action@v4
         with:
           context: .
+          platforms: linux/amd64,linux/arm64
           push: true
           tags: |
             ghcr.io/${{ github.repository }}:${{ env.VERSION }}
@@ -72,8 +73,5 @@ jobs:
           name: Release ${{ env.VERSION }}
           body: |
             ${{ env.CHANGELOG_CONTENT }}
-
-            ## Auto-Generated Release Notes
-            ${{ env.AUTO_RELEASE_NOTES }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
