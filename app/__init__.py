@@ -83,7 +83,7 @@ def make_celery(app):
     if app.config['LIDARR_API_KEY']:
         celery.conf.beat_schedule['request-lidarr-schedule'] = {
             'task': 'app.tasks.request_lidarr',
-            'schedule': crontab(minute='*/15')
+            'schedule': crontab(minute='50')
         }
     
     celery.conf.timezone = 'UTC'
