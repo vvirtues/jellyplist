@@ -55,18 +55,24 @@ def update_all_playlists_track_status(self):
                     for track in playlist.tracks:
                         total_tracks += 1
                         if track.filesystem_path and os.path.exists(track.filesystem_path):
+                            app.logger.debug(f"Track {track.name} is already downloaded at {track.filesystem_path}.")
                             available_tracks += 1
                             track.downloaded = True
+                            db.session.commit()
                         #If not found in filesystem, but a jellyfin_id is set, query the jellyfin server for the track and populate the filesystem_path from the response with the path
                         elif track.jellyfin_id:
                             jellyfin_track = jellyfin.get_item(jellyfin_admin_token, track.jellyfin_id)
                             if jellyfin_track and os.path.exists(jellyfin_track['Path']):
+                                app.logger.debug(f"Track {track.name} found in Jellyfin at {jellyfin_track['Path']}.")
                                 track.filesystem_path = jellyfin_track['Path']
                                 track.downloaded = True
+                                db.session.commit()
                                 available_tracks += 1
                             else:
                                 track.downloaded = False
                                 track.filesystem_path = None
+                                db.session.commit()
+                                
                         
                         
                             
