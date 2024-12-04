@@ -73,6 +73,8 @@ coverage/
 # macOS
 .DS_Store
 .cache
-cookies*.txt
+*cookies*.txt
 *.code-workspace
 set_env.sh
+notes.md
+DEV_BUILD

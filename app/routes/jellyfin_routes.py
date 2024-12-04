@@ -1,100 +1,90 @@
+from collections import defaultdict
 import time
-from flask import Flask, jsonify, render_template, request, redirect, url_for, session, flash
+from flask import Blueprint, Flask, jsonify, render_template, request, redirect, url_for, session, flash
 from sqlalchemy import insert
 from app import app, db,  jellyfin, functions, device_id,sp
-from app.models import Playlist,Track,  playlist_tracks
+from app.models import JellyfinUser, Playlist,Track,  playlist_tracks
+from spotipy.exceptions import SpotifyException
+from app.tasks import task_manager
 
-
-
+from app.registry.music_provider_registry import MusicProviderRegistry
 from jellyfin.objects import PlaylistMetadata
-
-
+from app.routes import pl_bp
 
 @app.route('/jellyfin_playlists')
 @functions.jellyfin_login_required
 def jellyfin_playlists():
-    try:
-        # Fetch playlists from Jellyfin
         playlists = jellyfin.get_playlists(session_token=functions._get_token_from_sessioncookie())
-        
-        # Extract Spotify playlist IDs from the database
-        spotify_playlist_ids = []
+        playlists_by_provider = defaultdict(list)
+        provider_playlists_data = {}
+
         for pl in playlists:
-            # Retrieve the playlist from the database using Jellyfin ID
-            from_db = Playlist.query.filter_by(jellyfin_id=pl['Id']).first()
-            if from_db and from_db.spotify_playlist_id:
-                spotify_playlist_ids.append(from_db.spotify_playlist_id)
-            else:
-                app.logger.warning(f"No database entry found for Jellyfin playlist ID: {pl['Id']}")
+            from_db : Playlist | None = Playlist.query.filter_by(jellyfin_id=pl['Id']).first()
+            if from_db and from_db.provider_playlist_id:
+                pl_id = from_db.provider_playlist_id
+                playlists_by_provider[from_db.provider_id].append(from_db)
 
-        if not spotify_playlist_ids:
-            flash('No Spotify playlists found to display.', 'warning')
-            return render_template('jellyfin_playlists.html', playlists=functions.prepPlaylistData({'playlists': {'items': []}}))
-        
-        # Use the cached function to fetch Spotify playlists
-        spotify_data = functions.get_cached_spotify_playlists(spotify_playlist_ids)
-        
-        # Prepare the data for the template
-        prepared_data = functions.prepPlaylistData(spotify_data)
-        
-        return render_template('jellyfin_playlists.html', playlists=prepared_data)
-    
-    except Exception as e:
-        app.logger.error(f"Error in /jellyfin_playlists route: {str(e)}")
-        flash('An error occurred while fetching playlists.', 'danger')
-        return render_template('jellyfin_playlists.html', playlists=functions.prepPlaylistData({'playlists': {'items': []}}))
-    
+                # 3. Fetch all Data from the provider using the get_playlist() method 
+        for provider_id, playlists in playlists_by_provider.items():
+            try:
+                provider_client = MusicProviderRegistry.get_provider(provider_id)
+            except ValueError:
+                flash(f"Provider {provider_id} not found.", "error")
+                continue
 
-@app.route('/addplaylist', methods=['POST'])
+            combined_playlists = []
+            for pl in playlists:
+                provider_playlist = provider_client.get_playlist(pl.provider_playlist_id)
+                # 4. Convert the playlists to CombinedPlaylistData
+                combined_data = functions.prepPlaylistData(provider_playlist)
+                if combined_data:
+                    combined_playlists.append(combined_data)
+
+            provider_playlists_data[provider_id] = combined_playlists
+
+                # 5. Display the resulting Groups in a template called 'monitored_playlists.html', one Heading per Provider
+        return render_template('monitored_playlists.html', provider_playlists_data=provider_playlists_data,title="Jellyfin Playlists" , subtitle="Playlists you have added to Jellyfin")
+
+@pl_bp.route('/addplaylist', methods=['POST'])
 @functions.jellyfin_login_required
 def add_playlist():
-    playlist_id = request.form.get('item_id')  # HTMX sends the form data
-    playlist_name = request.form.get('item_name')  # Optionally retrieve playlist name from the form
+    playlist_id = request.form.get('item_id')  
+    playlist_name = request.form.get('item_name')  
+    # also get the provider id from the query params
+    provider_id = request.args.get('provider')
     if not playlist_id:
         flash('No playlist ID provided')
         return ''
-
+    # if no provider_id is provided, then show an error and return an empty string
+    if not provider_id:
+        flash('No provider ID provided')
+        return ''
     try:
-        # Fetch playlist from Spotify API (or any relevant API)
-        playlist_data = functions.get_cached_spotify_playlist(playlist_id)
-
-        # Check if playlist already exists in the database
-        playlist = Playlist.query.filter_by(spotify_playlist_id=playlist_id).first()
-
+        # get the playlist from the correct provider
+        provider_client = MusicProviderRegistry.get_provider(provider_id)
+        playlist_data = provider_client.get_playlist(playlist_id)
+        # Check if playlist already exists in the database, using the provider_id and the provider_playlist_id
+        playlist = Playlist.query.filter_by(provider_playlist_id=playlist_id, provider_id=provider_id).first()
+        # Add new playlist in the database if it doesn't exist
+        # create the playlist via api key, with the first admin as 'owner' 
         if not playlist:
-            # Add new playlist if it doesn't exist
-            # create the playlist via api key, with the first admin as 'owner' 
-            fromJellyfin = jellyfin.create_music_playlist(functions._get_api_token(),playlist_data['name'],[],functions._get_admin_id())['Id']
-            playlist = Playlist(name=playlist_data['name'], spotify_playlist_id=playlist_id,spotify_uri=playlist_data['uri'],track_count = playlist_data['tracks']['total'], tracks_available=0, jellyfin_id = fromJellyfin)
+            fromJellyfin = jellyfin.create_music_playlist(functions._get_api_token(),playlist_data.name,[],functions._get_admin_id())['Id']
+            playlist = Playlist(name=playlist_data.name, provider_playlist_id=playlist_id,provider_uri=playlist_data.uri,track_count = len(playlist_data.tracks), tracks_available=0, jellyfin_id = fromJellyfin, provider_id=provider_id)
             db.session.add(playlist)
             db.session.commit()
             if app.config['START_DOWNLOAD_AFTER_PLAYLIST_ADD']:
-                functions.manage_task('download_missing_tracks')
-
-
+                task_manager.start_task('download_missing_tracks')
         # Get the logged-in user
-        user = functions._get_logged_in_user()
+        user : JellyfinUser = functions._get_logged_in_user()
         playlist.tracks_available = 0
         
-        spotify_tracks = {}
-        offset = 0
-        while True:
-            playlist_items = sp.playlist_items(playlist.spotify_playlist_id, offset=offset, limit=100)
-            items = playlist_items['items']
-            spotify_tracks.update({offset + idx: track['track'] for idx, track in enumerate(items) if track['track']})
+        for idx, track_data in enumerate(playlist_data.tracks):
             
-            if len(items) < 100:  # No more tracks to fetch
-                break
-            offset += 100  # Move to the next batch
-        for idx, track_data in spotify_tracks.items():
-            track_info = track_data
-            if not track_info:
-                continue
-            track = Track.query.filter_by(spotify_track_id=track_info['id']).first()
+            track = Track.query.filter_by(provider_track_id=track_data.track.id, provider_id=provider_id).first()
 
             if not track:
                 # Add new track if it doesn't exist
-                track = Track(name=track_info['name'], spotify_track_id=track_info['id'], spotify_uri=track_info['uri'], downloaded=False)
+                track = Track(name=track_data.track.name, provider_track_id=track_data.track.id, provider_uri=track_data.track.uri, downloaded=False,provider_id = provider_id)
                 db.session.add(track)
                 db.session.commit()
             elif track.downloaded:
@@ -118,12 +108,12 @@ def add_playlist():
             user.playlists.append(playlist)
             db.session.commit()
             jellyfin.add_users_to_playlist(session_token=functions._get_api_token(), user_id=functions._get_admin_id(),playlist_id = playlist.jellyfin_id,user_ids= [user.jellyfin_user_id])
-            flash(f'Playlist "{playlist_data["name"]}" successfully added','success')
+            flash(f'Playlist "{playlist_data.name}" successfully added','success')
             
         else:
-            flash(f'Playlist "{playlist_data["name"]}" already in your list')
+            flash(f'Playlist "{playlist_data.name}" already in your list')
         item = {
-            "name" : playlist_data["name"],
+            "name" : playlist_data.name,
             "id" : playlist_id,
             "can_add":False,
             "can_remove":True,
@@ -154,7 +144,7 @@ def delete_playlist(playlist_id):
         flash('Playlist removed')
         item = {
             "name" : playlist.name,
-            "id" : playlist.spotify_playlist_id,
+            "id" : playlist.provider_playlist_id,
             "can_add":True,
             "can_remove":False,
             "jellyfin_id" : playlist.jellyfin_id
@@ -178,7 +168,7 @@ def wipe_playlist(playlist_id):
     if playlist:
         # Delete the playlist
         name = playlist.name
-        id = playlist.spotify_playlist_id
+        id = playlist.provider_playlist_id
         jf_id = playlist.jellyfin_id
         db.session.delete(playlist)
         db.session.commit()
@@ -204,9 +194,9 @@ def get_jellyfin_stream(jellyfin_id):
 @functions.jellyfin_login_required
 def search_jellyfin():
     search_query = request.args.get('search_query')
-    spotify_id = request.args.get('spotify_id')
+    provider_track_id = request.args.get('provider_track_id')
     if search_query:
         results = jellyfin.search_music_tracks(functions._get_token_from_sessioncookie(), search_query)
         # Render only the search results section as response
-        return render_template('partials/_jf_search_results.html', results=results,spotify_id=  spotify_id)
+        return render_template('partials/_jf_search_results.html', results=results,provider_track_id=  provider_track_id,search_query = search_query)
     return jsonify({'error': 'No search query provided'}), 400

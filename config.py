@@ -11,12 +11,14 @@ class Config:
     JELLYFIN_REQUEST_TIMEOUT = int(os.getenv('JELLYFIN_REQUEST_TIMEOUT','10'))
     SPOTIFY_CLIENT_ID = os.getenv('SPOTIFY_CLIENT_ID')
     SPOTIFY_CLIENT_SECRET = os.getenv('SPOTIFY_CLIENT_SECRET')
+    SPOTIFY_COOKIE_FILE = os.getenv('SPOTIFY_COOKIE_FILE')
     JELLYPLIST_DB_HOST = os.getenv('JELLYPLIST_DB_HOST')
     JELLYPLIST_DB_PORT = int(os.getenv('JELLYPLIST_DB_PORT','5432'))
     JELLYPLIST_DB_USER = os.getenv('JELLYPLIST_DB_USER')
     JELLYPLIST_DB_PASSWORD = os.getenv('JELLYPLIST_DB_PASSWORD')
     START_DOWNLOAD_AFTER_PLAYLIST_ADD  = os.getenv('START_DOWNLOAD_AFTER_PLAYLIST_ADD',"false").lower() == 'true' # If a new Playlist is added, the Download Task will be scheduled immediately
     REFRESH_LIBRARIES_AFTER_DOWNLOAD_TASK  = os.getenv('REFRESH_LIBRARIES_AFTER_DOWNLOAD_TASK',"false").lower() == 'true' 
+    DISPLAY_EXTENDED_AUDIO_DATA = os.getenv('DISPLAY_EXTENDED_AUDIO_DATA',"false").lower() == 'true' 
     CACHE_TYPE = 'redis'
     CACHE_REDIS_PORT = 6379
     CACHE_REDIS_HOST = 'redis'
@@ -25,12 +27,21 @@ class Config:
     REDIS_URL = os.getenv('REDIS_URL','redis://redis:6379/0')
     SEARCH_JELLYFIN_BEFORE_DOWNLOAD = os.getenv('SEARCH_JELLYFIN_BEFORE_DOWNLOAD',"true").lower() == 'true'
     FIND_BEST_MATCH_USE_FFPROBE = os.getenv('FIND_BEST_MATCH_USE_FFPROBE','false').lower() == 'true'
+    SPOTIFY_COUNTRY_CODE = os.getenv('SPOTIFY_COUNTRY_CODE','DE')
+    LIDARR_API_KEY = os.getenv('LIDARR_API_KEY','') 
+    LIDARR_URL = os.getenv('LIDARR_URL','')
+    LIDARR_MONITOR_ARTISTS = os.getenv('LIDARR_MONITOR_ARTISTS','false').lower() == 'true'
+    MUSIC_STORAGE_BASE_PATH = os.getenv('MUSIC_STORAGE_BASE_PATH')
+    
     # SpotDL specific configuration
     SPOTDL_CONFIG = {
         'cookie_file': '/jellyplist/cookies.txt',
-        'output': '/jellyplist_downloads/__jellyplist/{track-id}',
+        # combine the path provided in MUSIC_STORAGE_BASE_PATH with the following path __jellyplist/{track-id} to get the value for output
+        
         'threads': 12
     }
+    if os.getenv('MUSIC_STORAGE_BASE_PATH'):
+        SPOTDL_CONFIG['output_file'] = os.path.join(MUSIC_STORAGE_BASE_PATH,'__jellyplist/{track-id}'),
     
     @classmethod
     def validate_env_vars(cls):
@@ -45,7 +56,8 @@ class Config:
             'JELLYPLIST_DB_HOST' : cls.JELLYPLIST_DB_HOST,
             'JELLYPLIST_DB_USER' : cls.JELLYPLIST_DB_USER,
             'JELLYPLIST_DB_PASSWORD' : cls.JELLYPLIST_DB_PASSWORD,
-            'REDIS_URL': cls.REDIS_URL
+            'REDIS_URL': cls.REDIS_URL,
+            'MUSIC_STORAGE_BASE_PATH': cls.MUSIC_STORAGE_BASE_PATH
         }
 
         missing_vars = [var for var, value in required_vars.items() if not value]

@@ -9,22 +9,22 @@ Jellyplist aims to be a companion app for your self-hosted [Jellyfin](https://je
 It´s definitely not a general Playlist Manager for Jellyfin.
 
 ## Features
-- **Discover Playlists**: Use well-known *Featured Playlists* listings.
-- **Categories**: Browse playlists by categories
+- **Discover Playlists**: Browse playlists like its nothing.
 - **View Monitored Playlists**: View playlists which are already synced by the server, adding these to your Jellyfin account will make them available immediately
 - **Search Playlist**: Search for playlists
 - **No Sign-Up or User-Accounts**: Jellyplist uses your local Jellyfin server for authentication
 - **Automatically keep track of changes**: Changes in order, added or removed songs will be tracked and synced with Jellyfin.
 - **Metadata Sync**: Playlist Metadata will be available at your Jellyfin Server
+- **Lidarr Integrations**: Automatically submit Artists or only Albums to your Lidarr instance
+- **Automatic Quality Upgrades**: When the same track from a playlist is added later with better quality, the playlist in Jellyfin will be updated to use the better sounding track.
 
 ## Getting Started
 
 The easiest way to start is by using docker and compose. 
 1. Log in on https://developers.spotify.com/. Go to the dashboard, create an app and get your Client ID and Secret
-2. Get your [cookies.txt file for spot-dl ](https://spotdl.readthedocs.io/en/latest/usage/#youtube-music-premium)
-> [!IMPORTANT]  
-> Currently a [youtube premium account](https://spotdl.readthedocs.io/en/latest/usage/#youtube-music-premium) is required, the next release will mitigate this.
-3. Prepare a `.env` File
+2. Get your [cookies.txt file for spot-dl ](https://spotdl.readthedocs.io/en/latest/usage/#youtube-music-premium) if you want downloaded files to have 256kbit/s, otherwise 128kbit/s
+3. Get your cookie-file from open.spotify.com , this works the same way as in step 2. 
+4. Prepare a `.env` File
 ```
 POSTGRES_USER = jellyplist
 POSTGRES_PASSWORD = jellyplist
@@ -37,10 +37,27 @@ SPOTIFY_CLIENT_SECRET = <Secret from Step 1>
 JELLYPLIST_DB_HOST = postgres-jellyplist #Hostname of the db Container
 JELLYPLIST_DB_USER = jellyplist
 JELLYPLIST_DB_PASSWORD = jellyplist
-# Optional: 
+MUSIC_STORAGE_BASE_PATH = '/storage/media/music' # The base path where your music library is located. Must be the same value as your music library in jellyfin
+
+### Optional: 
+
 # SEARCH_JELLYFIN_BEFORE_DOWNLOAD = false # defaults to true, before attempting to do a download with spotDL , the song will be searched first in the local library
+
 # START_DOWNLOAD_AFTER_PLAYLIST_ADD = true # defaults to false, If a new Playlist is added, the Download Task will be scheduled immediately
-# 
+
+# FIND_BEST_MATCH_USE_FFPROBE = true # Use ffprobe to gather quality details from a file to calculate quality score. Otherwise jellyplist will use details provided by jellyfin. defaults to false. 
+
+#REFRESH_LIBRARIES_AFTER_DOWNLOAD_TASK = true # jellyplist will trigger a music library update on your Jellyfin server, in case you dont have `Realtime Monitoring` enabled on your Jellyfin library. Defaults to false.
+
+# LOG_LEVEL = DEBUG # Defaults to INFO
+
+# SPOTIFY_COOKIE_FILE = '/jellyplist/spotify-cookie.txt' # Not necesarily needed, but if you like to browse your personal recomendations you must provide it so that the new api implementation is able to authenticate
+
+### Lidarr integration
+# LIDARR_API_KEY = aabbccddeeffgghh11223344 # self explaining
+# LIDARR_URL = http://<your_lidarr_ip>:8686 # too
+# LIDARR_MONITOR_ARTISTS = false # If false, only the corresponding album will be set to monitored in lidarr, if true the whole artist will be set as monitored. Be careful in the beginning as you might hammer your lidarr instance and you indexers. Defaults to false
+
 
 ```
 
@@ -81,8 +98,9 @@ services:
       - jellyplist-network
     volumes:
         # Map Your cookies.txt file to exac
-      - /your/local/path/cookies.txt:/jellyplist/cookies.txt 
-      - /storage/media/music:/jellyplist_downloads
+      - /your/local/path/cookies.txt:/jellyplist/cookies.txt  # 
+      - /your/local/path/open.spotify.com_cookies.txt:/jellyplist/spotify-cookie.txt
+      - ${MUSIC_STORAGE_BASE_PATH}:${MUSIC_STORAGE_BASE_PATH} # Jellyplist must be able to access the file paths like they are stored in Jellyfin
     env_file:
       - .env
 
@@ -95,7 +113,8 @@ services:
     volumes:
       # Map Your cookies.txt file to exac
       - /your/local/path/cookies.txt:/jellyplist/cookies.txt 
-      - /storage/media/music:/jellyplist_downloads
+      - /your/local/path/open.spotify.com_cookies.txt:/jellyplist/spotify-cookie.txt
+      - ${MUSIC_STORAGE_BASE_PATH}:${MUSIC_STORAGE_BASE_PATH} # Jellyplist must be able to access the file paths like they are stored in Jellyfin
     env_file:
       - .env
     depends_on:

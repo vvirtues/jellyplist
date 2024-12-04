@@ -1,7 +1,14 @@
 {% for task_name, task in tasks.items() %}
 <tr id="task-row-{{ task_name }}">
-    <td>{{ task_name }}</td>
-    <td>{{ task.state }}</td>
+    <td class="w-auto">
+        {% if task.lock_status %}
+        <i class="fas fa-lock text-warning"></i>
+        {% else %}
+        <i class="fas fa-unlock text-success"></i>
+        {% endif %}
+    </td>
+    <td class="w-25">{{ task_name }}</td>
+    <td class="w-50">{{ task.state }}</td>
     <td>
         {% if task.info.percent %}
         <div class="progress" style="height: 20px;">

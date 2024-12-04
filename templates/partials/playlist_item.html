@@ -31,12 +31,12 @@
       </div>
       <div class="mt-auto pt-3">
         {% if item.type == 'category'%}
-        <a href="{{ item.url }}" class="btn btn-primary" data-bs-toggle="tooltip" title="View Playlists">
+        <a href="{{ item.url }}" class="btn btn-primary" data-bs-toggle="tooltip" title="View Playlist">
           <i class="fa-solid fa-eye"></i>
         </a>
         {%else%}
 
-        <a href="/playlist/view/{{ item.id }}" class="btn btn-primary" data-bs-toggle="tooltip"
+        <a href="/playlist/view/{{ item.id }}?provider={{provider_id}}" class="btn btn-primary" data-bs-toggle="tooltip"
           title="View Playlist details">
           <i class="fa-solid fa-eye"></i>
         </a>

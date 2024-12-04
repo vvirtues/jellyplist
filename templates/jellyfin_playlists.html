@@ -1,6 +1,16 @@
 {% extends "base.html" %}
 
 {% block content %}
+{% if error_message %}
+<div class="alert alert-danger mt-5" role="alert">
+    <h4 class="alert-heading">🚨Something went wrong🚨</h4>
+    <p>{{ error_message }}</p>
+    <hr>
+    <p>Additional Information:</p>
+    <p>{{error_data}}</p>
+    
+</div>
+{% else %}
 <h1 >Your subscribed Jellyfin Playlists</h1>
 <h6 ></h6>
 <div class="row row-cols-1 row-cols-md-4 row-cols-lg-6 g-4" id="items-container">
@@ -10,6 +20,6 @@
 {% endfor %}
     
 </div>
-
+{%endif%}
 {% endblock %}
 

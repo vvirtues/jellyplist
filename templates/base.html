@@ -34,12 +34,22 @@
                 <nav>
                     <ul class="nav flex-column">
                         <li class="nav-item">
+                            <a class="nav-link" href="/"><i class="fab fa-house"></i> Home</a>
+                        </li>
+                        {% for provider in registered_providers %}
+                        <li class="nav-item">
+                            <a class="nav-link " href="/browse?provider={{provider}}">
+                                <i class="fab fa-{{provider.lower()}}"></i> Browse {{provider}}
+                            </a>
+                        </li>
+                        {% endfor %}
+                        <!-- <li class="nav-item">
                             <a class="nav-link" href="/playlists"><i class="fab fa-spotify"></i> Featured</a>
                         </li>
                         <li class="nav-item">
                             <a class="nav-link" href="/categories"><i class="fa-solid fa-layer-group"></i>
                                 Categories</a>
-                        </li>
+                        </li> -->
                         <li class="nav-item">
                             <a class="nav-link" href="/playlists/monitored"><i
                                     class="fa-solid fa-tower-observation"></i> Monitored</a>
@@ -69,12 +79,22 @@
                 </div>
                 <ul class="nav flex-column">
                     <li class="nav-item">
+                        <a class="nav-link" href="/"><i class="fas fa-house"></i> Home</a>
+                    </li>
+                    {% for provider in registered_providers %}
+                    <li class="nav-item">
+                        <a class="nav-link " href="/browse?provider={{provider}}">
+                            <i class="fab fa-{{provider.lower()}}"></i> Browse {{provider}}
+                        </a>
+                    </li>
+                    {% endfor %}
+                    <!-- <li class="nav-item">
                         <a class="nav-link text-white" href="/playlists"><i class="fab fa-spotify"></i> Featured</a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link text-white" href="/categories"><i class="fa-solid fa-layer-group"></i>
                             Categories</a>
-                    </li>
+                    </li> -->
                     <li class="nav-item">
                         <a class="nav-link text-white" href="/playlists/monitored"><i
                                 class="fa-solid fa-tower-observation"></i> Monitored </a>
@@ -108,29 +128,23 @@
                     <i class="fas fa-bars"></i>
                 </button>
 
-                <h1 class="mb-4 ms-3">{{ title }}</h1>
+                <!-- Search Form -->
+                <form action="/search" method="GET" class="d-flex flex-grow-1 mb-1 me-2">
+                    <input
+                        type="search"
+                        class="form-control me-2"
+                        name="query"
+                        placeholder="Search ..."
+                        aria-label="Search"
+                    >
+                    <button class="btn btn-primary" type="submit">Search</button>
+                </form>
 
-                <div class="d-flex align-items-center ">
-                    <form action="/search" method="GET" class="w-100">
-                        <div class="input-group">
-                            <input
-                                type="search"
-                                class="form-control"
-                                name="query"
-                                placeholder="Search Spotify..."
-                                aria-label="Search"
-                            >
-                            <button class="btn btn-primary" type="submit">Search</button>
-                        </div>
-                    </form>
-                    <div class="ms-4">
-                        <!-- Display Initials Badge -->
-                        <span >{{ session.get('jellyfin_user_name') }}</span>
-                    </div>
-                </div>
-
+                <!-- Display Initials Badge -->
+                <span>{{ session.get('jellyfin_user_name') }}</span>
             </div>
-
+                <h1 class="mb-1 ">{{ title }}</h1>
+                <h3 class="mb-4 ">{{ subtitle }}</h3>
             {% block content %}{% endblock %}
         </div>
     </div>

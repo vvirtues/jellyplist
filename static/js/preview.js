@@ -5,14 +5,14 @@ var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
 })
 
 // Function to open the search modal and trigger the search automatically
-function openSearchModal(trackTitle, spotify_id) {
+function openSearchModal(trackTitle, provider_track_id) {
   const modal = new bootstrap.Modal(document.getElementById('searchModal'));
   const searchQueryInput = document.getElementById('search-query');
-  const spotifyIdInput = document.getElementById('spotify-id');
+  const providerTrackIdInput = document.getElementById('provider-track-id');
 
   // Pre-fill the input fields
   searchQueryInput.value = trackTitle;
-  spotifyIdInput.value = spotify_id;
+  providerTrackIdInput.value = provider_track_id;
 
   // Show the modal
   modal.show();
@@ -85,10 +85,10 @@ function playJellyfinTrack(button, jellyfinId) {
     .catch(error => console.error('Error fetching Jellyfin stream URL:', error));
 }
 
-function handleJellyfinClick(event, jellyfinId, trackTitle, spotifyId) {
+function handleJellyfinClick(event, jellyfinId, trackTitle, providerTrackId) {
   if (event.ctrlKey) {
       // CTRL key is pressed, open the search modal
-      openSearchModal(trackTitle, spotifyId);
+      openSearchModal(trackTitle, providerTrackId);
   } else {
       // CTRL key is not pressed, play the track
       playJellyfinTrack(event.target, jellyfinId);
