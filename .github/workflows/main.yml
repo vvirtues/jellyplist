@@ -56,14 +56,14 @@ jobs:
             echo "CHANGELOG_CONTENT=No changelog available for this release." >> $GITHUB_ENV
           fi
 
-      # Generate auto-generated release notes
-      - name: Generate Auto Release Notes
-        id: release_notes
-        run: |
-          auto_notes=$(gh release create ${{ env.VERSION }} --generate-notes --prerelease --json body --jq .body)
-          echo "AUTO_RELEASE_NOTES<<EOF" >> $GITHUB_ENV
-          echo "$auto_notes" >> $GITHUB_ENV
-          echo "EOF" >> $GITHUB_ENV
+      # # Generate auto-generated release notes
+      # - name: Generate Auto Release Notes
+      #   id: release_notes
+      #   run: |
+      #     auto_notes=$(gh release create ${{ env.VERSION }} --generate-notes --prerelease --json body --jq .body)
+      #     echo "AUTO_RELEASE_NOTES<<EOF" >> $GITHUB_ENV
+      #     echo "$auto_notes" >> $GITHUB_ENV
+      #     echo "EOF" >> $GITHUB_ENV
 
       # Create a release on GitHub
       - name: Create GitHub Release
