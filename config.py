@@ -31,13 +31,17 @@ class Config:
     LIDARR_API_KEY = os.getenv('LIDARR_API_KEY','') 
     LIDARR_URL = os.getenv('LIDARR_URL','')
     LIDARR_MONITOR_ARTISTS = os.getenv('LIDARR_MONITOR_ARTISTS','false').lower() == 'true'
+    MUSIC_STORAGE_BASE_PATH = os.getenv('MUSIC_STORAGE_BASE_PATH')
     
     # SpotDL specific configuration
     SPOTDL_CONFIG = {
         'cookie_file': '/jellyplist/cookies.txt',
-        'output': '/jellyplist_downloads/__jellyplist/{track-id}',
+        # combine the path provided in MUSIC_STORAGE_BASE_PATH with the following path __jellyplist/{track-id} to get the value for output
+        
         'threads': 12
     }
+    if os.getenv('MUSIC_STORAGE_BASE_PATH'):
+        SPOTDL_CONFIG['output_file'] = os.path.join(MUSIC_STORAGE_BASE_PATH,'__jellyplist/{track-id}'),
     
     @classmethod
     def validate_env_vars(cls):
@@ -52,7 +56,8 @@ class Config:
             'JELLYPLIST_DB_HOST' : cls.JELLYPLIST_DB_HOST,
             'JELLYPLIST_DB_USER' : cls.JELLYPLIST_DB_USER,
             'JELLYPLIST_DB_PASSWORD' : cls.JELLYPLIST_DB_PASSWORD,
-            'REDIS_URL': cls.REDIS_URL
+            'REDIS_URL': cls.REDIS_URL,
+            'MUSIC_STORAGE_BASE_PATH': cls.MUSIC_STORAGE_BASE_PATH
         }
 
         missing_vars = [var for var, value in required_vars.items() if not value]
