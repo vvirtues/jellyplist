@@ -160,10 +160,6 @@ app.logger.debug(f"Debug logging active")
 from app.routes import pl_bp, routes, jellyfin_routes
 app.register_blueprint(pl_bp)
 
-from . import tasks
-if "worker" in sys.argv:
-    tasks.release_lock("download_missing_tracks_lock")
-
 from app import filters  # Import the filters dictionary
 
 # Register all filters

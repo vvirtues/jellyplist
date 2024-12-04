@@ -127,6 +127,13 @@ class SpotifyClient(MusicProviderClient):
         }
         l.debug(f"starting request: {self.base_url}/{endpoint}")
         response = requests.get(f"{self.base_url}/{endpoint}", headers=headers, params=params, cookies=self.cookies)
+        # if the response is unauthorized, we need to reauthenticate
+        if response.status_code == 401:
+            l.debug("reauthenticating")
+            self.authenticate()
+            headers['authorization'] = f'Bearer {self.session_data.get("accessToken", "")}'
+            headers['client-token'] = self.client_token.get('token','')
+            response = requests.get(f"{self.base_url}/{endpoint}", headers=headers, params=params, cookies=self.cookies)
         
         response.raise_for_status()
         return response.json()

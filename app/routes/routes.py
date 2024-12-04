@@ -68,14 +68,11 @@ def save_lidarr_config():
 @functions.jellyfin_admin_required
 def task_manager():
     statuses = {}
-    for task_name, task_id in functions.TASK_STATUS.items():
-        if task_id:
-            result = AsyncResult(task_id)
-            statuses[task_name] = {'state': result.state, 'info': result.info if result.info else {}}
-        else:
-            statuses[task_name] = {'state': 'NOT STARTED', 'info': {}}
+    for task_name, task_id in tasks.task_manager.tasks.items():
+        statuses[task_name] = tasks.task_manager.get_task_status(task_name)
+
     
-    return render_template('admin/tasks.html', tasks=statuses,lock_keys  = functions.LOCK_KEYS)
+    return render_template('admin/tasks.html', tasks=statuses)
 
 @app.route('/admin')
 @app.route('/admin/link_issues')
@@ -115,7 +112,7 @@ def link_issues():
 @app.route('/run_task/<task_name>', methods=['POST'])
 @functions.jellyfin_admin_required
 def run_task(task_name):
-    status, info = functions.manage_task(task_name)
+    status, info = tasks.task_manager.start_task(task_name)
     
     # Rendere nur die aktualisierte Zeile der Task
     task_info = {task_name: {'state': status, 'info': info}}
@@ -126,12 +123,9 @@ def run_task(task_name):
 @functions.jellyfin_admin_required
 def task_status():
     statuses = {}
-    for task_name, task_id in functions.TASK_STATUS.items():
-        if task_id:
-            result = AsyncResult(task_id)
-            statuses[task_name] = {'state': result.state, 'info': result.info if result.info else {}}
-        else:
-            statuses[task_name] = {'state': 'NOT STARTED', 'info': {}}
+    for task_name, task_id in tasks.task_manager.tasks.items():
+        statuses[task_name] = tasks.task_manager.get_task_status(task_name)
+        
 
     # Render the HTML partial template instead of returning JSON
     return render_template('partials/_task_status.html', tasks=statuses)
@@ -396,5 +390,6 @@ def unlock_key():
 
 @pl_bp.route('/test')
 def test():
+    tasks.update_all_playlists_track_status()
     return '' 
     

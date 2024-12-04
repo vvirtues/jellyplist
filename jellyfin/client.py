@@ -310,6 +310,7 @@ class JellyfinClient:
         
         response = requests.delete(url, headers=self._get_headers(session_token=session_token), timeout = self.timeout)
         self.logger.debug(f"Response = {response.status_code}")
+        logging.getLogger('requests').setLevel(logging.WARNING)
 
         if response.status_code == 204:  # 204 No Content indicates successful deletion
             return {"status": "success", "message": "Playlist removed successfully"}
@@ -318,11 +319,8 @@ class JellyfinClient:
     
     def get_item(self, session_token: str, item_id: str):
         url = f'{self.base_url}/Items/{item_id}'
-        self.logger.debug(f"Url={url}")
-        
+        logging.getLogger('requests').setLevel(logging.WARNING)
         response = requests.get(url, headers=self._get_headers(session_token=session_token), timeout = self.timeout)
-        self.logger.debug(f"Response = {response.status_code}")
-        
         if response.status_code == 200:
             return response.json()
         else:

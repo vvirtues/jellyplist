@@ -17,48 +17,6 @@ from spotipy.exceptions import SpotifyException
 
 import re
 
-TASK_STATUS = {
-    'update_all_playlists_track_status': None,
-    'download_missing_tracks': None,
-    'check_for_playlist_updates': None,
-    'update_jellyfin_id_for_downloaded_tracks' : None,
-    
-    
-}
-if app.config['LIDARR_API_KEY']:
-    TASK_STATUS['request_lidarr'] = None
-    
-LOCK_KEYS = [
-    'update_all_playlists_track_status_lock',    
-    'download_missing_tracks_lock',
-    'check_for_playlist_updates_lock',
-    'update_jellyfin_id_for_downloaded_tracks_lock' ,
-    'full_update_jellyfin_ids',
-    'request_lidarr_lock'
-]
-
-def manage_task(task_name):
-    task_id = TASK_STATUS.get(task_name)
-    
-    if task_id:
-        result = AsyncResult(task_id)
-        if result.state in ['PENDING', 'STARTED']: 
-            return result.state, result.info if result.info else {}
-    if task_name == 'update_all_playlists_track_status':
-        result = tasks.update_all_playlists_track_status.delay()
-    elif task_name == 'download_missing_tracks':
-        result = tasks.download_missing_tracks.delay()
-    elif task_name == 'check_for_playlist_updates':
-        result = tasks.check_for_playlist_updates.delay()
-    elif task_name == 'update_jellyfin_id_for_downloaded_tracks':
-        result = tasks.update_jellyfin_id_for_downloaded_tracks.delay()
-    elif task_name == 'request_lidarr':
-        result = tasks.request_lidarr.delay()
-
-    TASK_STATUS[task_name] = result.id  
-    return result.state, result.info if result.info else {}
-
-
 def prepPlaylistData(playlist: base.Playlist) -> Optional[CombinedPlaylistData]:
     jellyfin_user = JellyfinUser.query.filter_by(jellyfin_user_id=session['jellyfin_user_id']).first()
     if not jellyfin_user:
