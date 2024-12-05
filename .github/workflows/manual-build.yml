@@ -58,5 +58,6 @@ jobs:
           tags: |
             ghcr.io/${{ github.repository }}:${{ github.sha }} 
             ghcr.io/${{ github.repository }}:dev 
+            ghcr.io/${{ github.repository }}:${{ env.VERSION }}
 
       
