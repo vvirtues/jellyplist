@@ -41,7 +41,9 @@ class Config:
         'threads': 12
     }
     if os.getenv('MUSIC_STORAGE_BASE_PATH'):
-        SPOTDL_CONFIG['output_file'] = os.path.join(MUSIC_STORAGE_BASE_PATH,'__jellyplist/{track-id}'),
+        
+        output_path = os.path.join(MUSIC_STORAGE_BASE_PATH,'__jellyplist/{track-id}')
+        SPOTDL_CONFIG.update({'output': output_path})
     
     @classmethod
     def validate_env_vars(cls):
