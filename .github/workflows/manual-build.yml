@@ -59,5 +59,11 @@ jobs:
             ghcr.io/${{ github.repository }}:${{ env.COMMIT_SHA }} 
             ghcr.io/${{ github.repository }}:dev 
             ghcr.io/${{ github.repository }}:${{ env.VERSION }}
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.VERSION }}
+          name: Dev Release ${{ env.VERSION }}
+          generate_release_notes: true
 
       
