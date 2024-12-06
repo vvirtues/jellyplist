@@ -64,5 +64,6 @@ jobs:
           tag_name: ${{ env.VERSION }}
           name: Dev Release ${{ env.VERSION }}
           generate_release_notes: true
+          make_latest: false
 
       
