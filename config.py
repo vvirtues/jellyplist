@@ -32,7 +32,7 @@ class Config:
     LIDARR_URL = os.getenv('LIDARR_URL','')
     LIDARR_MONITOR_ARTISTS = os.getenv('LIDARR_MONITOR_ARTISTS','false').lower() == 'true'
     MUSIC_STORAGE_BASE_PATH = os.getenv('MUSIC_STORAGE_BASE_PATH')
-    
+    CHECK_FOR_UPDATES = os.getenv('CHECK_FOR_UPDATES','true').lower() == 'true'
     # SpotDL specific configuration
     SPOTDL_CONFIG = {
         'cookie_file': '/jellyplist/cookies.txt',

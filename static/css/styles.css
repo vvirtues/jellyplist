@@ -3,16 +3,18 @@ body {
 }
 
 .sidebar {
-    background-color: #1a1d21; 
+    background-color: #1a1d21;
     height: 100vh;
     padding-top: 20px;
     padding-left: 10px;
     color: white;
 }
+
 .top-bar {
-    background-color: #1a1d21; 
+    background-color: #1a1d21;
 
 }
+
 .sidebar h3 {
     color: white;
     padding-left: 15px;
@@ -50,47 +52,51 @@ body {
     width: 140px;
     margin-right: 10px;
 }
-.logo img{
+
+.logo img {
     width: 100%;
 }
+
 @media screen and (min-width: 1600px) {
     .modal-dialog {
-      max-width: 90%; /* New width for default modal */
+        max-width: 90%;
+        /* New width for default modal */
     }
 }
-.searchbar{
+
+.searchbar {
     margin-bottom: auto;
     margin-top: auto;
     height: 60px;
     background-color: #353b48;
     border-radius: 30px;
     padding: 10px;
-    }
+}
 
-    .search_input{
+.search_input {
     color: white;
     border: 0;
     outline: 0;
     background: none;
     width: 450px;
-    caret-color:transparent;
+    caret-color: transparent;
     line-height: 40px;
     transition: width 0.4s linear;
-    }
+}
 
-     .searchbar:hover > .search_input{
+.searchbar:hover>.search_input {
     /* padding: 0 10px; */
     width: 450px;
-    caret-color:red;
+    caret-color: red;
     /* transition: width 0.4s linear; */
-    } 
+}
 
-    .searchbar:hover > .search_icon{
+.searchbar:hover>.search_icon {
     background: white;
     color: #e74c3c;
-    }
+}
 
-    .search_icon{
+.search_icon {
     height: 40px;
     width: 40px;
     float: right;
@@ -98,6 +104,24 @@ body {
     justify-content: center;
     align-items: center;
     border-radius: 50%;
-    color:white;
-    text-decoration:none;
+    color: white;
+    text-decoration: none;
+}
+
+.btn-pulsing {
+    animation: pulse 2s infinite;
+  }
+  
+  @keyframes pulse {
+    0% {
+      transform: scale(1);
     }
+  
+    50% {
+      transform: scale(1.08);
+    }
+  
+    100% {
+      transform: scale(1);
+    }
+  }

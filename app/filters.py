@@ -3,7 +3,8 @@ import re
 from markupsafe import Markup
 
 from app.classes import AudioProfile
-from app import app
+from app import app, functions, read_dev_build_file
+from .version import __version__
 
 filters = {}
 
@@ -55,6 +56,37 @@ def audioprofile(text: str, path: str) -> Markup:
     )
     return Markup(audio_profile_html)
 
+@template_filter('version_check')
+def version_check(version: str) -> Markup:
+    version = f"{__version__}{read_dev_build_file()}"
+    # if version contains a dash and the text after the dash is LOCAL, return version as a blue badge
+    if app.config['CHECK_FOR_UPDATES']:
+        if '-' in version and version.split('-')[1] == 'LOCAL':
+            return Markup(f"<span class='badge rounded-pill bg-primary'>{version}</span>")
+        # else if the version string contains a dash and the text after the dash is not LOCAL, check whether it contains another dash (like in e.g. v0.1.7-dev-89a1bc2) and split both parts 
+        elif '-' in version and version.split('-')[1] != 'LOCAL' :
+            branch, commit_sha = version.split('-')[1], version.split('-')[2]
+            nra,url =  functions.get_latest_dev_releases(branch_name = branch, commit_sha = commit_sha)
+            if nra:
+                return Markup(f"<a href='{url}' target='_blank'><span class='badge rounded-pill text-bg-warning btn-pulsing' data-bs-toggle='tooltip' title='An update for the {branch} branch is available.'>{version}</span></a>")
+            else:
+                return Markup(f"<span class='badge rounded-pill text-bg-secondary'>{version}</span>")
+        else:
+            nra,url = functions.get_latest_release(version)
+            if nra:
+                return Markup(f"<a href='{url}' target='_blank'><span class='badge rounded-pill text-bg-warning btn-pulsing' data-bs-toggle='tooltip' title='An update is available.'>{version}</span></a>")
+            
+            
+        return Markup(f"<span class='badge rounded-pill text-bg-primary'>{version}</span>")
+    else:
+        return Markup(f"<span class='badge rounded-pill text-bg-info'>{version}</span>")
+        
+        
+        
+    
+    
+    
+    
 
 @template_filter('jellyfin_link')
 def jellyfin_link(jellyfin_id: str) -> Markup:
