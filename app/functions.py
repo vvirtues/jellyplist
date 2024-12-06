@@ -207,3 +207,41 @@ def get_longest_substring(input_string):
     substrings = re.split(pattern, input_string)
     longest_substring = max(substrings, key=len, default="")
     return longest_substring
+
+@cache.memoize(timeout=3600*2)
+def get_latest_dev_releases(branch_name :str, commit_sha : str):
+    try:
+        response = requests.get('https://api.github.com/repos/kamilkosek/jellyplist/releases')
+        if response.status_code == 200:
+            data = response.json()
+            latest_release = None
+            for release in data:
+                if branch_name in release['tag_name']:
+                    if latest_release is None or release['published_at'] > latest_release['published_at']:
+                        latest_release = release
+                        
+            if latest_release:
+                response = requests.get(f'https://api.github.com/repos/kamilkosek/jellyplist/git/ref/tags/{latest_release["tag_name"]}')
+                if response.status_code == 200:
+                    data = response.json()
+                    if commit_sha != data['object']['sha'][:7]:
+                        return True, latest_release['html_url']
+                            
+                        
+        return False, ''
+    except requests.exceptions.RequestException as e:
+        app.logger.error(f"Error fetching latest version: {str(e)}")
+    return False, ''
+
+@cache.memoize(timeout=3600*2)
+def get_latest_release(tag_name :str):
+    try:
+        response = requests.get('https://api.github.com/repos/kamilkosek/jellyplist/releases/latest')
+        if response.status_code == 200:
+            data = response.json()
+            if data['tag_name'] != tag_name:
+                return True, data['html_url']
+        return False, ''
+    except requests.exceptions.RequestException as e:
+        app.logger.error(f"Error fetching latest version: {str(e)}")
+    return False,''
