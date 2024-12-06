@@ -367,7 +367,7 @@ class JellyfinClient:
             raise Exception(f"Failed to download image from Spotify: {response.content}")
         
         # Step 2: Check the image content type (assume it's JPEG or PNG based on the content type from the response)
-        content_type = response.headers.get('Content-Type')
+        content_type = response.headers.get('Content-Type').lower()
         if content_type not in ['image/jpeg', 'image/png', 'application/octet-stream']:
             raise Exception(f"Unsupported image format: {content_type}")
         # Todo: 
