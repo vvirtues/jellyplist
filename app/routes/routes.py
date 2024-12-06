@@ -68,11 +68,12 @@ def save_lidarr_config():
 @functions.jellyfin_admin_required
 def task_manager():
     statuses = {}
+    lock_keys = []
     for task_name, task_id in tasks.task_manager.tasks.items():
         statuses[task_name] = tasks.task_manager.get_task_status(task_name)
-
-    
-    return render_template('admin/tasks.html', tasks=statuses)
+        lock_keys.append(f"{task_name}_lock")
+    lock_keys.append('full_update_jellyfin_ids_lock')
+    return render_template('admin/tasks.html', tasks=statuses,lock_keys = lock_keys)
 
 @app.route('/admin')
 @app.route('/admin/link_issues')
@@ -116,6 +117,7 @@ def run_task(task_name):
     
     # Rendere nur die aktualisierte Zeile der Task
     task_info = {task_name: {'state': status, 'info': info}}
+    
     return render_template('partials/_task_status.html', tasks=task_info)
 
 
@@ -123,12 +125,15 @@ def run_task(task_name):
 @functions.jellyfin_admin_required
 def task_status():
     statuses = {}
+    lock_keys = []
     for task_name, task_id in tasks.task_manager.tasks.items():
         statuses[task_name] = tasks.task_manager.get_task_status(task_name)
+        lock_keys.append(f"{task_name}_lock")
         
+    lock_keys.append('full_update_jellyfin_ids_lock')
 
     # Render the HTML partial template instead of returning JSON
-    return render_template('partials/_task_status.html', tasks=statuses)
+    return render_template('partials/_task_status.html', tasks=statuses, lock_keys = lock_keys)
 
 
 
