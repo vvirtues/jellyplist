@@ -129,7 +129,12 @@ def download_missing_tracks(self):
                 failed_downloads = 0
                 for track in undownloaded_tracks:
                     app.logger.info(f"Processing track: {track.name} [{track.provider_track_id}]")
-
+                    self.update_state(state=f'[{processed_tracks}/{total_tracks}] {track.name} [{track.provider_track_id}]', meta={
+                        'current': processed_tracks,
+                        'total': total_tracks,
+                        'percent':  (processed_tracks / total_tracks) * 100 if processed_tracks > 0 else 0,
+                        'failed': failed_downloads
+                    })
                     # Check if the track already exists in the output directory
                     file_path = f"{output_dir.replace('{track-id}', track.provider_track_id)}.mp3"
                     # region search before download
@@ -229,7 +234,7 @@ def download_missing_tracks(self):
                     progress = (processed_tracks / total_tracks) * 100
                     db.session.commit()
 
-                    self.update_state(state='PROGRESS', meta={
+                    self.update_state(state=f'[{processed_tracks}/{total_tracks}] {track.name} [{track.provider_track_id}]', meta={
                         'current': processed_tracks,
                         'total': total_tracks,
                         'percent': progress,
