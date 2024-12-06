@@ -65,6 +65,6 @@ jobs:
           name: Dev Release ${{ env.VERSION }}
           generate_release_notes: true
           make_latest: false
-          target_commitish: ${{ env.COMMIT_SHA }}
+          
 
       
