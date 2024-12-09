@@ -106,6 +106,18 @@ app.logger.setLevel(log_level)
 FORMAT = "[%(asctime)s][%(filename)18s:%(lineno)4s - %(funcName)20s() ] %(levelname)7s - %(message)s" 
 logging.basicConfig(format=FORMAT)
 
+# Add RotatingFileHandler to log to a file
+# if worker is in sys.argv, we are running a celery worker, so we log to a different file
+if 'worker' in sys.argv:
+    log_file = os.path.join("/var/log/", 'jellyplist_worker.log')
+elif 'beat' in sys.argv:
+    log_file = os.path.join("/var/log/", 'jellyplist_beat.log')
+else:
+    log_file = os.path.join("/var/log/", 'jellyplist.log')
+file_handler = RotatingFileHandler(log_file, maxBytes=2 * 1024 * 1024, backupCount=10)
+file_handler.setFormatter(logging.Formatter(FORMAT))
+app.logger.addHandler(file_handler)
+
 Config.validate_env_vars()
 cache = Cache(app)
 redis_client = redis.StrictRedis(host=app.config['CACHE_REDIS_HOST'], port=app.config['CACHE_REDIS_PORT'], db=0, decode_responses=True)
