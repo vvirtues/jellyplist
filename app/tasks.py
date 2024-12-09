@@ -619,7 +619,7 @@ class TaskManager:
             raise ValueError(f"Task {task_name} is not defined.")
         task = globals()[task_name].delay(*args, **kwargs)
         self.tasks[task_name] = task.id
-        return task.id
+        return task.id,'STARTED'
 
     def get_task_status(self, task_name):
         if task_name not in self.tasks:
