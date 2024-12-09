@@ -12,6 +12,6 @@ __pycache__/
 
 # Ignore Git files
 .git
-cookies*
+*cookies*
 set_env.sh
 jellyplist.code-workspace
