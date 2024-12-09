@@ -26,6 +26,7 @@ The easiest way to start is by using docker and compose.
 3. Get your cookie-file from open.spotify.com , this works the same way as in step 2. 
 4. Prepare a `.env` File
 ```
+IMAGE = ghcr.io/kamilkosek/jellyplist:latest
 POSTGRES_USER = jellyplist
 POSTGRES_PASSWORD = jellyplist
 SECRET_KEY = Keykeykesykykesky  # Secret key for session management
@@ -79,7 +80,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       PGDATA: /data/postgres
     volumes:
-       - postgres:/data/postgres
+       - /jellyplist_pgdata/postgres:/data/postgres
     ports:
       - "5432:5432"
     networks:
@@ -88,7 +89,7 @@ services:
   
   jellyplist:
     container_name: jellyplist
-    image: ghcr.io/kamilkosek/jellyplist:latest
+    image: ${IMAGE}
     depends_on: 
       - postgres
       - redis
@@ -97,43 +98,11 @@ services:
     networks:
       - jellyplist-network
     volumes:
-        # Map Your cookies.txt file to exac
-      - /your/local/path/cookies.txt:/jellyplist/cookies.txt  # 
-      - /your/local/path/open.spotify.com_cookies.txt:/jellyplist/spotify-cookie.txt
-      - ${MUSIC_STORAGE_BASE_PATH}:${MUSIC_STORAGE_BASE_PATH} # Jellyplist must be able to access the file paths like they are stored in Jellyfin
+      - /jellyplist/cookies.txt:/jellyplist/cookies.txt
+      - /jellyplist/open.spotify.com_cookies.txt:/jellyplist/spotify-cookie.txt
+      - ${MUSIC_STORAGE_BASE_PATH}:${MUSIC_STORAGE_BASE_PATH}
     env_file:
       - .env
-
-    # The jellyplist-worker is used to perform background tasks, such as downloads and playlist updates.
-    # It is the same container, but with a different command
-  jellyplist-worker:
-    container_name: jellyplist-worker
-    image: ghcr.io/kamilkosek/jellyplist:latest
-    command: ["celery", "-A", "app.celery", "worker", "--loglevel=info"]
-    volumes:
-      # Map Your cookies.txt file to exac
-      - /your/local/path/cookies.txt:/jellyplist/cookies.txt 
-      - /your/local/path/open.spotify.com_cookies.txt:/jellyplist/spotify-cookie.txt
-      - ${MUSIC_STORAGE_BASE_PATH}:${MUSIC_STORAGE_BASE_PATH} # Jellyplist must be able to access the file paths like they are stored in Jellyfin
-    env_file:
-      - .env
-    depends_on:
-      - postgres
-      - redis
-    networks:
-      - jellyplist-network
-    # jellyplist-beat is used to schedule the background tasks
-  jellyplist-beat:
-    container_name: jellyplist-beat
-    image: ghcr.io/kamilkosek/jellyplist:latest
-    command: ["celery", "-A", "app.celery", "beat", "--loglevel=info"]
-    env_file:
-      - .env
-    depends_on:
-      - postgres
-      - redis
-    networks:
-      - jellyplist-network
 
 networks:
   jellyplist-network:
@@ -141,7 +110,6 @@ networks:
 
 volumes:
     postgres:
-    pgadmin:
     redis_data:
 ```
 5. Start your stack with `docker compose up -d`
