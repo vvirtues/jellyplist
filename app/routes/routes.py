@@ -123,7 +123,7 @@ def view_logs():
     if log_name == 'beat' and os.path.exists('/var/log/jellyplist_beat.log'):
         with open('/var/log/jellyplist_beat.log', 'r',encoding='utf-8') as f:
             logs = f.readlines()
-    return render_template('admin/logview.html', logs=str.join('',logs).replace('<',"_").replace('>',"_"),name=log_name)
+    return render_template('admin/logview.html', logs=str.join('',logs),name=log_name)
 
 @app.route('/admin/setloglevel', methods=['POST'])
 @functions.jellyfin_admin_required

@@ -116,8 +116,9 @@
                 },
 
             });
+
             let editor = monaco.editor.create(document.getElementById('editor'), {
-                value: `{{ logs }}`,
+                value: `{{logs | safe }}`,
                 language: 'jellyplistLog',
                 readOnly: true,
                 minimap: { enabled: false },
