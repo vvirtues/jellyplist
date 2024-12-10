@@ -443,10 +443,9 @@ def associate_track():
 @app.route("/unlock_key",methods = ['POST'])
 @functions.jellyfin_admin_required
 def unlock_key():
-     
     key_name = request.form.get('inputLockKey')
     if key_name:
-        tasks.release_lock(key_name)
+        tasks.task_manager.release_lock(key_name)
         flash(f'Lock {key_name} released', category='success')
     return ''
 
