@@ -103,7 +103,7 @@ for handler in app.logger.handlers:
 log_level = getattr(logging, app.config['LOG_LEVEL'], logging.INFO)  # Default to DEBUG if invalid
 app.logger.setLevel(log_level)
 
-FORMAT = "[%(asctime)s][%(filename)18s:%(lineno)4s - %(funcName)20s() ] %(levelname)7s - %(message)s" 
+FORMAT = "[%(asctime)s][%(filename)18s:%(lineno)4s - %(funcName)36s() ] %(levelname)7s - %(message)s" 
 logging.basicConfig(format=FORMAT)
 
 # Add RotatingFileHandler to log to a file
