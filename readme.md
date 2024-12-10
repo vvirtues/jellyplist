@@ -41,6 +41,8 @@ JELLYPLIST_DB_PASSWORD = jellyplist
 MUSIC_STORAGE_BASE_PATH = '/storage/media/music' # The base path where your music library is located. Must be the same value as your music library in jellyfin
 
 ### Optional: 
+# SPOTDL_PROXY = http://proxy:8080
+# SPOTDL_OUTPUT_FORMAT = "/{artist}/{artists} - {title}" # Supported variables: {title}, {artist},{artists}, {album}, Will be joined with to get a complete path
 
 # SEARCH_JELLYFIN_BEFORE_DOWNLOAD = false # defaults to true, before attempting to do a download with spotDL , the song will be searched first in the local library
 
