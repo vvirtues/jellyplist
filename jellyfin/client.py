@@ -454,6 +454,16 @@ class JellyfinClient:
     
         return response.json()
     
+    def get_users(self, session_token: str):
+        url = f'{self.base_url}/Users'
+        
+        response = requests.get(url, headers=self._get_headers(session_token=session_token), timeout = self.timeout)
+        
+        if response.status_code != 200:
+            raise Exception(f"Failed to fetch users: {response.content}")
+    
+        return response.json()
+        
     def search_track_in_jellyfin(self, session_token: str, preview_url: str, song_name: str, artist_names: list):
         """
         Search for a track in Jellyfin by comparing the preview audio to tracks in the library.
