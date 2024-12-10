@@ -1,7 +1,6 @@
 import os
 import sys
 
-
 class Config:
     LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO').upper()
     SECRET_KEY = os.getenv('SECRET_KEY')  
@@ -33,6 +32,8 @@ class Config:
     LIDARR_MONITOR_ARTISTS = os.getenv('LIDARR_MONITOR_ARTISTS','false').lower() == 'true'
     MUSIC_STORAGE_BASE_PATH = os.getenv('MUSIC_STORAGE_BASE_PATH')
     CHECK_FOR_UPDATES = os.getenv('CHECK_FOR_UPDATES','true').lower() == 'true'
+    SPOTDL_PROXY = os.getenv('SPOTDL_PROXY',None)
+    
     # SpotDL specific configuration
     SPOTDL_CONFIG = {
         'cookie_file': '/jellyplist/cookies.txt',

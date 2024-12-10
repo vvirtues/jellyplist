@@ -211,6 +211,10 @@ def download_missing_tracks(self):
                             app.logger.debug(f"Found {cookie_file}, using it for spotDL")
                             command.append("--cookie-file")
                             command.append(cookie_file)
+                        if app.config['SPOTDL_PROXY']:
+                            app.logger.debug(f"Using proxy: {app.config['SPOTDL_PROXY']}")
+                            command.append("--proxy")
+                            command.append(app.config['SPOTDL_PROXY'])
 
                         result = subprocess.run(command, capture_output=True, text=True, timeout=90)
                         if result.returncode == 0 and os.path.exists(file_path):
