@@ -21,7 +21,7 @@ from lidarr.classes import Artist
 
 @signals.celeryd_init.connect
 def setup_log_format(sender, conf, **kwargs):
-    FORMAT = "[%(asctime)s][%(filename)18s:%(lineno)4s - %(funcName)23s() ] %(levelname)7s - %(message)s"  
+    FORMAT = "[%(asctime)s][%(filename)18s:%(lineno)4s - %(funcName)42s() ] %(levelname)7s - %(message)s"  
     
     conf.worker_log_format = FORMAT.strip().format(sender)
     conf.worker_task_log_format = FORMAT.format(sender)
@@ -94,6 +94,9 @@ def update_all_playlists_track_status(self):
 
                 app.logger.info("All playlists' track statuses updated.")
                 return {'status': 'All playlists updated', 'total': total_playlists, 'processed': processed_playlists}
+        except Exception as e:
+            app.logger.error(f"Error downloading tracks: {str(e)}", exc_info=True)
+            return {'status': 'Error downloading tracks'}
         finally:
             task_manager.release_lock(lock_key)
     else:
@@ -287,6 +290,9 @@ def download_missing_tracks(self):
                     'processed': processed_tracks,
                     'failed': failed_downloads
                 }
+        except Exception as e:
+            app.logger.error(f"Error downloading tracks: {str(e)}", exc_info=True)
+            return {'status': 'Error downloading tracks'}
         finally:
             task_manager.release_lock(lock_key)
             if app.config['REFRESH_LIBRARIES_AFTER_DOWNLOAD_TASK']:
@@ -399,6 +405,9 @@ def check_for_playlist_updates(self):
                         app.logger.info(f"Processed {processed_playlists}/{total_playlists} playlists.")
 
                 return {'status': 'Playlist update check completed', 'total': total_playlists, 'processed': processed_playlists}
+        except Exception as e:
+            app.logger.error(f"Error downloading tracks: {str(e)}", exc_info=True)
+            return {'status': 'Error downloading tracks'}
         finally:
             task_manager.release_lock(lock_key)
     else:
@@ -458,7 +467,9 @@ def update_jellyfin_id_for_downloaded_tracks(self):
 
                 app.logger.info("Finished updating Jellyfin IDs for all tracks.")
                 return {'status': 'All tracks updated', 'total': total_tracks, 'processed': processed_tracks}
-
+        except Exception as e:
+            app.logger.error(f"Error downloading tracks: {str(e)}", exc_info=True)
+            return {'status': 'Error downloading tracks'}
         finally:
             task_manager.release_lock(lock_key)
     else:
@@ -541,6 +552,9 @@ def request_lidarr(self):
 
                     app.logger.info(f'Requests sent to Lidarr. Total items: {total_items}')
                     return {'status': 'Request sent to Lidarr'}
+                except Exception as e:
+                    app.logger.error(f"Error downloading tracks: {str(e)}", exc_info=True)
+                    return {'status': 'Error downloading tracks'}
                 finally:
                     task_manager.release_lock(lock_key)
     
