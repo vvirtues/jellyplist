@@ -112,6 +112,22 @@ def get_cached_provider_track(track_id : str,provider_id : str)-> base.Track:
         app.logger.error(f"Error fetching track {track_id} from {provider_id}: {str(e)}")
         return None
 
+@cache.memoize(timeout=3600)
+def get_cached_provider_playlist(playlist_id : str,provider_id : str)-> base.Playlist:
+    """
+    Fetches a playlist by its ID, utilizing caching to minimize API calls.
+
+    :param playlist_id: The playlist ID.
+    :return: Playlist data as a dictionary, or None if an error occurs.
+    """
+    try:
+        # get the provider from the registry
+        provider = MusicProviderRegistry.get_provider(provider_id)
+        playlist_data = provider.get_playlist(playlist_id)
+        return playlist_data
+    except Exception as e:
+        app.logger.error(f"Error fetching playlist {playlist_id} from {provider_id}: {str(e)}")
+        return None
 
 def get_tracks_for_playlist(data: List[PlaylistTrack], provider_id : str ) -> List[CombinedTrackData]:
     is_admin = session.get('is_admin', False)
