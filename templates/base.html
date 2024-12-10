@@ -56,14 +56,10 @@
                                     class="fa-solid fa-tower-observation"></i> Monitored</a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="/jellyfin_playlists"><i class="fas fa-list"></i> My Playlists</a>
+                            <a class="nav-link" href="/jellyfin_playlists"><i class="fas fa-list"></i> Jellyfin
+                                Playlists</a>
                         </li>
-                        {% if session.get('is_admin') %}
-                        <li class="nav-item">
-                            <a class="nav-link" href="/admin"><i class="fas fa-flask"></i> Admin</a>
-                        </li>
-                        {% endif %}
-                        {% if session.get('is_admin') %}
+                        {% if session.get('is_admin') and session.get('debug') %}
                         <li class="nav-item">
                             <a class="nav-link" href="/admin"><i class="fas fa-flask"></i> Admin</a>
                         </li>
@@ -105,7 +101,8 @@
                                 class="fa-solid fa-tower-observation"></i> Monitored </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link text-white" href="/jellyfin_playlists"><i class="fas fa-list"></i> My Playlists</a>
+                        <a class="nav-link text-white" href="/jellyfin_playlists"><i class="fas fa-list"></i> Jellyfin
+                            Playlists</a>
                     </li>
                     {% if session.get('is_admin') %}
                     <li class="nav-item">
