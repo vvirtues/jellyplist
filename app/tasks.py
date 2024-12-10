@@ -166,8 +166,8 @@ def download_missing_tracks(self):
                         continue
                     
                     # if outpur_dir not ends with .mp3, we need to add it
-                    if not outpur_dir.endswith(".mp3"):
-                        outpur_dir += ".mp3"
+                    if not output_dir.endswith(".mp3"):
+                        output_dir += ".mp3"
                     if not file_path.endswith(".mp3"):
                         file_path += ".mp3"
                         
