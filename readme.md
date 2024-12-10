@@ -74,7 +74,7 @@ services:
       - jellyplist-network
   postgres:
     container_name: postgres-jellyplist
-    image: postgres
+    image: postgres:17.2
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
