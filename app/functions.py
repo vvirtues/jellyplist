@@ -245,3 +245,7 @@ def get_latest_release(tag_name :str):
     except requests.exceptions.RequestException as e:
         app.logger.error(f"Error fetching latest version: {str(e)}")
     return False,''
+
+def set_log_level(level):
+    app.logger.setLevel(level)
+    app.logger.info(f"Log level set to {level}")

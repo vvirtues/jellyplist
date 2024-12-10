@@ -108,7 +108,65 @@ def link_issues():
 
     return render_template('admin/link_issues.html' , tracks = tracks )
 
+@app.route('/admin/logs')
+@functions.jellyfin_admin_required
+def view_logs():
+    # parse the query parameter
+    log_name = request.args.get('name')
+    logs = []
+    if log_name == 'logs' or not log_name and os.path.exists('/var/log/jellyplist.log'):
+        with open('/var/log/jellyplist.log', 'r',encoding='utf-8') as f:
+            logs = f.readlines()
+    if log_name == 'worker' and os.path.exists('/var/log/jellyplist_worker.log'):
+        with open('/var/log/jellyplist_worker.log', 'r', encoding='utf-8') as f:
+            logs = f.readlines()
+    if log_name == 'beat' and os.path.exists('/var/log/jellyplist_beat.log'):
+        with open('/var/log/jellyplist_beat.log', 'r',encoding='utf-8') as f:
+            logs = f.readlines()
+    return render_template('admin/logview.html', logs=str.join('',logs).replace('<',"_").replace('>',"_"),name=log_name)
 
+@app.route('/admin/setloglevel', methods=['POST'])
+@functions.jellyfin_admin_required
+def set_log_level():
+    loglevel = request.form.get('logLevel')
+    if loglevel:
+        if loglevel in ['DEBUG','INFO','WARNING','ERROR','CRITICAL']:
+            functions.set_log_level(loglevel)
+            flash(f'Log level set to {loglevel}', category='success')
+    return redirect(url_for('view_logs'))
+
+@app.route('/admin/logs/getLogsForIssue')
+@functions.jellyfin_admin_required
+def get_logs_for_issue():
+    # get the last 200 lines of all log files
+    last_lines = -300
+    logs = []
+    logs += f'## Logs and Details for Issue ##\n'
+    logs += f'Version: *{__version__}{read_dev_build_file()}*\n'    
+    if os.path.exists('/var/log/jellyplist.log'):
+        with open('/var/log/jellyplist.log', 'r',encoding='utf-8') as f:
+            logs += f'### jellyfin.log\n'    
+            logs += f'```log\n'    
+            logs += f.readlines()[last_lines:]
+            logs += f'```\n'    
+            
+    if os.path.exists('/var/log/jellyplist_worker.log'):
+        with open('/var/log/jellyplist_worker.log', 'r', encoding='utf-8') as f:
+            logs += f'### jellyfin_worker.log\n'    
+            logs += f'```log\n'    
+            logs += f.readlines()[last_lines:]
+            logs += f'```\n'     
+    
+    if os.path.exists('/var/log/jellyplist_beat.log'):
+        with open('/var/log/jellyplist_beat.log', 'r',encoding='utf-8') as f:
+            logs += f'### jellyplist_beat.log\n'    
+            logs += f'```log\n'    
+            logs += f.readlines()[last_lines:]
+            logs += f'```\n'       
+    # in the logs array, anonymize IP addresses
+    logs = [re.sub(r'(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})', 'xxx.xxx.xxx.xxx', log) for log in logs]
+    
+    return jsonify({'logs': logs})
 
 @app.route('/run_task/<task_name>', methods=['POST'])
 @functions.jellyfin_admin_required
