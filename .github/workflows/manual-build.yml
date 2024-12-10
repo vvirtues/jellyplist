@@ -32,7 +32,7 @@ jobs:
       - name: Extract Version
         id: extract_version
         run: |
-          version=$(python3 -c "import version; print(f'${{ env.BRANCH_NAME}}-{version.__version__}')")
+          version=$(python3 -c "import version; print(f'${version.__version__}')")
           echo "VERSION=$version" >> $GITHUB_ENV
 
       - name: Read Changelog
@@ -68,13 +68,15 @@ jobs:
           push: true
           tags: |
             ghcr.io/${{ github.repository }}:${{ env.COMMIT_SHA }} 
-            ghcr.io/${{ github.repository }}:dev 
-            ghcr.io/${{ github.repository }}:${{ env.VERSION }}
+            ghcr.io/${{ github.repository }}:${{ env.BRANCH_NAME }}
+            ghcr.io/${{ github.repository }}:${{ env.BRANCH_NAME }}-${{ env.VERSION }}
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ env.VERSION }}
-          name: Dev Release ${{ env.VERSION }}
+          tag_name: |
+            ${{ env.BRANCH_NAME }}-${{ env.VERSION }}
+          name: |
+            ${{ env.BRANCH_NAME }} Release ${{ env.VERSION }}
           body: |
             ${{ env.CHANGELOG_CONTENT }}
           generate_release_notes: true
