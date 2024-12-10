@@ -32,7 +32,7 @@ jobs:
       - name: Extract Version
         id: extract_version
         run: |
-          version=$(python3 -c "import version; print(f'${version.__version__}')")
+          version=$(python3 -c "import version; print(f'{version.__version__}')")
           echo "VERSION=$version" >> $GITHUB_ENV
 
       - name: Read Changelog
