@@ -35,6 +35,18 @@ jobs:
           version=$(python3 -c "import version; print(f'${{ env.BRANCH_NAME}}-{version.__version__}')")
           echo "VERSION=$version" >> $GITHUB_ENV
 
+      - name: Read Changelog
+        id: changelog
+        run: |
+          if [ -f changelogs/${{ env.VERSION }}.md ]; then
+            changelog_content=$(cat changelogs/${{ env.VERSION }}.md)
+            echo "CHANGELOG_CONTENT<<EOF" >> $GITHUB_ENV
+            echo "$changelog_content" >> $GITHUB_ENV
+            echo "EOF" >> $GITHUB_ENV
+          else
+            echo "CHANGELOG_CONTENT=No changelog available for this release." >> $GITHUB_ENV
+          fi
+
       # Set up Docker
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
@@ -63,6 +75,8 @@ jobs:
         with:
           tag_name: ${{ env.VERSION }}
           name: Dev Release ${{ env.VERSION }}
+          body: |
+            ${{ env.CHANGELOG_CONTENT }}
           generate_release_notes: true
           make_latest: false
           
