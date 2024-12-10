@@ -243,7 +243,7 @@ def openPlaylist():
             try:
                 provider_client = MusicProviderRegistry.get_provider(provider_id)
                 extracted_playlist_id = provider_client.extract_playlist_id(playlist)
-                provider_playlist = provider_client.get_playlist(extracted_playlist_id)
+                provider_playlist = functions.get_cached_provider_playlist(extracted_playlist_id, provider_id)
                 
                 combined_data = functions.prepPlaylistData(provider_playlist)
                 if combined_data:
@@ -280,8 +280,8 @@ def browse_page(page_id):
 @functions.jellyfin_login_required
 def monitored_playlists():
 
-    # 1. Get all Playlists from the Database.
-    all_playlists = Playlist.query.all()
+    # 1. Get all Playlists from the Database and order them by Id    
+    all_playlists = Playlist.query.order_by(Playlist.id).all()
 
     # 2. Group them by provider
     playlists_by_provider = defaultdict(list)
@@ -299,7 +299,7 @@ def monitored_playlists():
 
         combined_playlists = []
         for pl in playlists:
-            provider_playlist = provider_client.get_playlist(pl.provider_playlist_id)
+            provider_playlist = functions.get_cached_provider_playlist(pl.provider_playlist_id,pl.provider_id)
             # 4. Convert the playlists to CombinedPlaylistData
             combined_data = functions.prepPlaylistData(provider_playlist)
             if combined_data:

@@ -34,7 +34,10 @@ def jellyfin_playlists():
 
             combined_playlists = []
             for pl in playlists:
-                provider_playlist = provider_client.get_playlist(pl.provider_playlist_id)
+                # Use the cached provider_playlist_id to fetch the playlist from the provider
+                provider_playlist = functions.get_cached_provider_playlist(pl.provider_playlist_id,pl.provider_id)
+                #provider_playlist = provider_client.get_playlist(pl.provider_playlist_id)
+                
                 # 4. Convert the playlists to CombinedPlaylistData
                 combined_data = functions.prepPlaylistData(provider_playlist)
                 if combined_data:
