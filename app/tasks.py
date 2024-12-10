@@ -125,6 +125,7 @@ def download_missing_tracks(self):
                     return {'status': 'No undownloaded tracks found'}
 
                 app.logger.info(f"Found {total_tracks} tracks to download.")
+                app.logger.debug(f"output_dir: {output_dir}")
                 processed_tracks = 0
                 failed_downloads = 0
                 for track in undownloaded_tracks:
@@ -136,11 +137,44 @@ def download_missing_tracks(self):
                         'failed': failed_downloads
                     })
                     # Check if the track already exists in the output directory
-                    file_path = f"{output_dir.replace('{track-id}', track.provider_track_id)}.mp3"
+                    if os.getenv('SPOTDL_OUTPUT_FORMAT') == '__jellyplist/{track-id}':
+                        file_path = f"{output_dir.replace('{track-id}', track.provider_track_id)}"
+                    else:
+                        # if the output format is other than the default, we need to fetch the track first! 
+                        spotify_track = functions.get_cached_provider_track(track.provider_track_id, provider_id="Spotify")
+                        # spotify_track has name, artists, album and id
+                        # name needs to be mapped to {title}
+                        # artist[0] needs to be mapped to {artist}
+                        # artists needs to be mapped to {artists}
+                        # album needs to be mapped to {album} , but needs to be checked if it is set or not, because it is Optional
+                        # id needs to be mapped to {track-id}
+                        # the output format is then used to create the file path
+                        if spotify_track:
+                            
+                            file_path = output_dir.replace("{title}",spotify_track.name)
+                            file_path = file_path.replace("{artist}",spotify_track.artists[0].name)
+                            file_path = file_path.replace("{artists}",",".join([artist.name for artist in spotify_track.artists]))
+                            file_path = file_path.replace("{album}",spotify_track.album.name if spotify_track.album else "")
+                            file_path = file_path.replace("{track-id}",spotify_track.id)
+                            app.logger.debug(f"File path: {file_path}")
+                    
+                    if not file_path:
+                        app.logger.error(f"Error creating file path for track {track.name}.")
+                        failed_downloads += 1
+                        track.download_status = "Error creating file path"
+                        db.session.commit()
+                        continue
+                    
+                    # if outpur_dir not ends with .mp3, we need to add it
+                    if not outpur_dir.endswith(".mp3"):
+                        outpur_dir += ".mp3"
+                    if not file_path.endswith(".mp3"):
+                        file_path += ".mp3"
+                        
+                                            
                     # region search before download
                     if search_before_download:
                         app.logger.info(f"Searching for track in Jellyfin: {track.name}")
-                        spotify_track = functions.get_cached_provider_track(track.provider_track_id, provider_id="Spotify")
                         # at first try to find the track without fingerprinting it
                         best_match = find_best_match_from_jellyfin(track)
                         if best_match:
@@ -186,13 +220,13 @@ def download_missing_tracks(self):
                         #endregion
                                 
                     #endregion 
-                    
-                    if os.path.exists(file_path):
-                        app.logger.info(f"Track {track.name} is already downloaded at {file_path}. Marking as downloaded.")
-                        track.downloaded = True
-                        track.filesystem_path = file_path
-                        db.session.commit()
-                        continue
+                    if file_path:
+                        if os.path.exists(file_path):
+                            app.logger.info(f"Track {track.name} is already downloaded at {file_path}. Marking as downloaded.")
+                            track.downloaded = True
+                            track.filesystem_path = file_path
+                            db.session.commit()
+                            continue
 
                     
 
@@ -217,10 +251,11 @@ def download_missing_tracks(self):
                             command.append(app.config['SPOTDL_PROXY'])
 
                         result = subprocess.run(command, capture_output=True, text=True, timeout=90)
-                        if result.returncode == 0 and os.path.exists(file_path):
+                        if result.returncode == 0:
                             track.downloaded = True
-                            track.filesystem_path = file_path
-                            app.logger.info(f"Track {track.name} downloaded successfully to {file_path}.")
+                            if file_path:
+                                track.filesystem_path = file_path
+                                app.logger.info(f"Track {track.name} downloaded successfully to {file_path}.")
                         else:
                             app.logger.error(f"Download failed for track {track.name}.")
                             if result.stdout:

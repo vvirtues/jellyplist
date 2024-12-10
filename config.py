@@ -33,7 +33,7 @@ class Config:
     MUSIC_STORAGE_BASE_PATH = os.getenv('MUSIC_STORAGE_BASE_PATH')
     CHECK_FOR_UPDATES = os.getenv('CHECK_FOR_UPDATES','true').lower() == 'true'
     SPOTDL_PROXY = os.getenv('SPOTDL_PROXY',None)
-    
+    SPOTDL_OUTPUT_FORMAT = os.getenv('SPOTDL_OUTPUT_FORMAT','__jellyplist/{artist}-{title}.mp3')
     # SpotDL specific configuration
     SPOTDL_CONFIG = {
         'cookie_file': '/jellyplist/cookies.txt',
@@ -43,7 +43,8 @@ class Config:
     }
     if os.getenv('MUSIC_STORAGE_BASE_PATH'):
         
-        output_path = os.path.join(MUSIC_STORAGE_BASE_PATH,'__jellyplist/{track-id}')
+        output_path = os.path.join(MUSIC_STORAGE_BASE_PATH,SPOTDL_OUTPUT_FORMAT)
+        
         SPOTDL_CONFIG.update({'output': output_path})
     
     @classmethod
