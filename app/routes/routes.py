@@ -506,6 +506,10 @@ def remove_jellyfin_user_from_playlist():
 def add_jellyfin_user_to_playlist():
     playlist_id = request.args.get('playlist')
     user_id = request.args.get('user')
+    return add_jellyfin_user_to_playlist_internal(user_id, playlist_id)
+    
+    
+def add_jellyfin_user_to_playlist_internal(user_id, playlist_id):
     # assign this playlist also to the user in the database
     # get the playlist from the db
     playlist = Playlist.query.filter_by(jellyfin_id=playlist_id).first()
@@ -522,8 +526,8 @@ def add_jellyfin_user_to_playlist():
     if playlist not in user.playlists:
         user.playlists.append(playlist)
         db.session.commit()
-    
-       
+
+        
     if not playlist_id or not user_id:
         return jsonify({'error': 'Playlist or User not specified'}), 400
     jellyfin.add_users_to_playlist(session_token=functions._get_api_token(), playlist_id=playlist_id, user_id=functions._get_admin_id(), user_ids=[user_id])
