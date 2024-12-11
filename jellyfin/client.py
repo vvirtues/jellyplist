@@ -2,6 +2,7 @@ import os
 import re
 import subprocess
 import tempfile
+from typing import Optional
 import numpy as np
 import requests
 import base64
@@ -350,6 +351,34 @@ class JellyfinClient:
             # Raise an exception if the request failed
             raise Exception(f"Failed to remove user from playlist: {response.content}")
     
+    def remove_user_from_playlist2(self, session_token: str, playlist_id: str, user_id: str, admin_user_id : str):
+        #TODO: This is a workaround for the issue where the above method does not work        
+        metadata = self.get_playlist_metadata(session_token= session_token, user_id= admin_user_id, playlist_id= playlist_id)
+        # Construct the API URL
+        url = f'{self.base_url}/Playlists/{playlist_id}'
+        users_data = []
+        current_users = self.get_playlist_users(session_token=session_token, playlist_id= playlist_id)
+        for cu in current_users:
+            # This way we remove the user
+            if cu['UserId'] != user_id:
+                users_data.append({'UserId': cu['UserId'], 'CanEdit': cu['CanEdit']})
+                
+        data = {
+            'Users' : users_data
+        }
+        # Prepare the headers
+        headers = self._get_headers(session_token=session_token)
+        
+        # Send the request to Jellyfin API
+        response = requests.post(url, headers=headers, json=data,timeout = self.timeout)
+
+        # Check for success
+        if response.status_code == 204:
+            self.update_playlist_metadata(session_token= session_token, user_id= admin_user_id, playlist_id= playlist_id , updates= metadata)
+            return {"status": "success", "message": f"Users added to playlist {playlist_id}."}
+        else:
+            raise Exception(f"Failed to add users to playlist: {response.status_code} - {response.content}")
+        
 
     def set_playlist_cover_image(self, session_token: str, playlist_id: str, provider_image_url: str):
         """
@@ -454,8 +483,10 @@ class JellyfinClient:
     
         return response.json()
     
-    def get_users(self, session_token: str):
+    def get_users(self, session_token: str, user_id: Optional[str] = None):
         url = f'{self.base_url}/Users'
+        if user_id:
+            url = f'{url}/{user_id}'
         
         response = requests.get(url, headers=self._get_headers(session_token=session_token), timeout = self.timeout)
         
