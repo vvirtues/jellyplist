@@ -53,7 +53,7 @@ def jellyfin_playlists():
 def add_playlist():
     playlist_id = request.form.get('item_id')  
     playlist_name = request.form.get('item_name')  
-    
+    additional_users = None
     if not playlist_id and request.data:
         # get data convert from json to dict
         data = request.get_json()
