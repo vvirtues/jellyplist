@@ -13,9 +13,115 @@
 </button>
 {% endif %}
 {% if session['is_admin'] and item.can_remove %}
-<button class="btn btn-danger " hx-delete="{{ url_for('wipe_playlist', playlist_id=item['jellyfin_id']) }}"
-hx-include="this" hx-swap="outerHTML" hx-target="#item-can-remove-{{ item.id }}" data-bs-toggle="tooltip" title="Delete playlist from monitoring and remove (DELETE FOR ALL USERS) from Jellyfin">
-<i class="fa-solid fa-trash"> </i>
+<button class="btn btn-danger" id="confirm-delete-{{item['jellyfin_id']}}" data-bs-toggle="tooltip" title="Delete playlist from monitoring and remove (DELETE FOR ALL USERS) from Jellyfin">
+  <i class="fa-solid fa-trash"> </i>
 </button>
+
+<script>
+document.getElementById("confirm-delete-{{item['jellyfin_id']}}").addEventListener('click', function() {
+  const button = this;
+  const icon = button.querySelector('i');
+  if (icon.classList.contains('fa-trash')) {
+    icon.classList.remove('fa-trash');
+    icon.classList.add('fa-check');
+    button.setAttribute('title', 'Click again to confirm deletion');
+  } else {
+    fetch("{{ url_for('wipe_playlist', playlist_id=item['jellyfin_id']) }}", {
+      method: 'DELETE',
+      headers: {
+        'HX-Request': 'true'
+      }
+    }).then(response => {
+      if (response.ok) {
+        button.closest('#item-can-remove-{{ item.id }}').outerHTML = '';
+      }
+    });
+  }
+});
+</script>
 </span>
 {% endif%}
+{% if session['is_admin'] and item.can_remove %}
+<button class="btn btn-info" id="manage-users-{{item['jellyfin_id']}}" data-bs-toggle="tooltip" title="Manage Users">
+  <i class="fa-solid fa-user"> </i>
+</button>
+{% endif %}
+<div class="modal fade" id="manageUsersModal-{{item['jellyfin_id']}}" tabindex="-1" aria-labelledby="manageUsersModal-{{item['jellyfin_id']}}Label" aria-hidden="true" data-bs-modal-backdrop="false">
+  <div class="modal-dialog modal-sm modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="manageUsersModal-{{item['jellyfin_id']}}Label">Manage Users</h5>
+      </div>
+      <div class="modal-body">
+        <div id="assignedUsers-{{item['jellyfin_id']}}">
+          <!-- Assigned users will be dynamically loaded here -->
+        </div>
+        <div class="input-group mt-3">
+          <select class="form-select" id="availableUsers-{{item['jellyfin_id']}}">
+            <!-- Available users will be dynamically loaded here -->
+          </select>
+          <button class="btn btn-primary" id="addUserButton-{{item['jellyfin_id']}}">Add User to Playlist</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+document.getElementById("manage-users-{{item['jellyfin_id']}}").addEventListener('click', function() {
+  var modal = new bootstrap.Modal(document.getElementById("manageUsersModal-{{item['jellyfin_id']}}"));
+  modal.show();
+  // Load assigned and available users via AJAX
+  loadUsers{{item['jellyfin_id']}}();
+});
+
+function loadUsers{{item['jellyfin_id']}}() {
+  // Example AJAX call to load assigned users
+  fetch("/admin/getJellyfinPlaylistUsers?playlist={{item['jellyfin_id']}}")
+    .then(response => response.json())
+    .then(data => {
+      console.log("jellyfin playlist id: {{item['jellyfin_id']}}");
+      const assignedUsersDiv = document.getElementById("assignedUsers-{{item['jellyfin_id']}}");
+      console.log(assignedUsersDiv);
+      assignedUsersDiv.innerHTML = '';
+      data.assigned_users.forEach(user => {
+        const badge = document.createElement('span');
+        badge.classList.add('badge', 'bg-primary', 'me-1');
+        badge.innerHTML = `${user.Name} <button class="btn btn-danger btn-sm ms-1" onclick="removeUser{{item['jellyfin_id']}}('${user.UserId}')">×</button>`;
+        assignedUsersDiv.appendChild(badge);
+      });
+
+      const availableUsersSelect = document.getElementById("availableUsers-{{item['jellyfin_id']}}");
+      availableUsersSelect.innerHTML = '';
+      data.remaining_users.forEach(user => {
+        const option = document.createElement('option');
+        option.value = user.Id;
+        option.textContent = user.Name;
+        availableUsersSelect.appendChild(option);
+      });
+    });
+}
+
+function removeUser{{item['jellyfin_id']}}(userId) {
+  // Example AJAX call to remove user
+  fetch(`/admin/removeJellyfinUserFromPlaylist?user=${userId}&playlist={{item['jellyfin_id']}}`)
+    .then(response => response.json())
+    .then(data => {
+      if (data.success) {
+        loadUsers{{item['jellyfin_id']}}();
+      }
+    });
+}
+
+document.getElementById("addUserButton-{{item['jellyfin_id']}}").addEventListener('click', function() {
+  const userId = document.getElementById("availableUsers-{{item['jellyfin_id']}}").value;
+  // Example AJAX call to add user
+  fetch(`/admin/addJellyfinUserToPlaylist?user=${userId}&playlist={{item['jellyfin_id']}}`)
+    .then(response => response.json())
+    .then(data => {
+      if (data.success) {
+        loadUsers{{item['jellyfin_id']}}();
+      }
+    });
+});
+</script>
