@@ -50,7 +50,7 @@ playlist_tracks = db.Table('playlist_tracks',
 
 class Track(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(150), nullable=False)
+    name = db.Column(db.String(200), nullable=False)
     provider_track_id = db.Column(db.String(120), unique=True, nullable=False)
     provider_uri = db.Column(db.String(120), unique=True, nullable=False)
     downloaded = db.Column(db.Boolean())
