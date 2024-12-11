@@ -418,11 +418,18 @@ def update_jellyfin_id_for_downloaded_tracks(self):
             app.logger.info("Starting Jellyfin ID update for tracks...")
 
             with app.app_context():
-                downloaded_tracks = Track.query.filter_by(downloaded=True, jellyfin_id=None).all()
                 
+                downloaded_tracks = Track.query.filter(
+                    Track.downloaded == True,
+                    Track.jellyfin_id == None,
+                    (Track.quality_score < app.config['QUALITY_SCORE_THRESHOLD']) | (Track.quality_score == None)
+                ).all()
                 if task_manager.acquire_lock(full_update_key, expiration=60*60*24):
                     app.logger.info(f"performing full update on jellyfin track ids. (Update tracks and playlists if better quality will be found)")
-                    downloaded_tracks = Track.query.all()
+                    app.logger.info(f"\tQUALITY_SCORE_THRESHOLD = {app.config['QUALITY_SCORE_THRESHOLD']}")
+                    downloaded_tracks = Track.query.filter(
+                        (Track.quality_score < app.config['QUALITY_SCORE_THRESHOLD']) | (Track.quality_score == None)
+                    ).all()
                 else:
                     app.logger.debug(f"doing update on tracks with downloaded = True and jellyfin_id = None")
                 total_tracks = len(downloaded_tracks)
@@ -436,6 +443,7 @@ def update_jellyfin_id_for_downloaded_tracks(self):
                 for track in downloaded_tracks:
                     try:
                         best_match = find_best_match_from_jellyfin(track)
+                        
                         if best_match:
                             track.downloaded = True
                             if track.jellyfin_id != best_match['Id']:
@@ -445,7 +453,7 @@ def update_jellyfin_id_for_downloaded_tracks(self):
                                 track.filesystem_path = best_match['Path']
                                 app.logger.info(f"Updated filesystem_path for track: {track.name} ({track.provider_track_id})")
                                 
-                                
+                            track.quality_score = best_match['quality_score']    
                             
                             db.session.commit()
                         else:
@@ -611,7 +619,9 @@ def find_best_match_from_jellyfin(track: Track):
                     if quality_score > best_quality_score:
                         best_match = result
                         best_quality_score = quality_score
-
+        # attach the quality_score to the best_match
+        if best_match:
+            best_match['quality_score'] = best_quality_score
         return best_match
     except Exception as e:
         app.logger.error(f"Error searching Jellyfin for track {track.name}: {str(e)}")

@@ -34,6 +34,7 @@ class Config:
     CHECK_FOR_UPDATES = os.getenv('CHECK_FOR_UPDATES','true').lower() == 'true'
     SPOTDL_PROXY = os.getenv('SPOTDL_PROXY',None)
     SPOTDL_OUTPUT_FORMAT = os.getenv('SPOTDL_OUTPUT_FORMAT','__jellyplist/{artist}-{title}.mp3')
+    QUALITY_SCORE_THRESHOLD = float(os.getenv('QUALITY_SCORE_THRESHOLD',1000.0))
     # SpotDL specific configuration
     SPOTDL_CONFIG = {
         'cookie_file': '/jellyplist/cookies.txt',
