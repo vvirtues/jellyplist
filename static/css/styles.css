@@ -58,7 +58,7 @@ body {
 }
 
 @media screen and (min-width: 1600px) {
-    .modal-dialog {
+    .modal-xl {
         max-width: 90%;
         /* New width for default modal */
     }
