@@ -45,7 +45,6 @@ document.getElementById("confirm-delete-{{item['jellyfin_id']}}").addEventListen
 <button class="btn btn-info" id="manage-users-{{item['jellyfin_id']}}" data-bs-toggle="tooltip" title="Manage Users">
   <i class="fa-solid fa-user"> </i>
 </button>
-{% endif %}
 <div class="modal fade" id="manageUsersModal-{{item['jellyfin_id']}}" tabindex="-1" aria-labelledby="manageUsersModal-{{item['jellyfin_id']}}Label" aria-hidden="true" data-bs-modal-backdrop="false">
   <div class="modal-dialog modal-sm modal-dialog-centered">
     <div class="modal-content">
@@ -66,17 +65,14 @@ document.getElementById("confirm-delete-{{item['jellyfin_id']}}").addEventListen
     </div>
   </div>
 </div>
-
 <script>
 document.getElementById("manage-users-{{item['jellyfin_id']}}").addEventListener('click', function() {
   var modal = new bootstrap.Modal(document.getElementById("manageUsersModal-{{item['jellyfin_id']}}"));
   modal.show();
-  // Load assigned and available users via AJAX
   loadUsers{{item['jellyfin_id']}}();
 });
 
 function loadUsers{{item['jellyfin_id']}}() {
-  // Example AJAX call to load assigned users
   fetch("/admin/getJellyfinPlaylistUsers?playlist={{item['jellyfin_id']}}")
     .then(response => response.json())
     .then(data => {
@@ -86,7 +82,7 @@ function loadUsers{{item['jellyfin_id']}}() {
       assignedUsersDiv.innerHTML = '';
       data.assigned_users.forEach(user => {
         const badge = document.createElement('span');
-        badge.classList.add('badge', 'bg-primary', 'me-1');
+        badge.classList.add('badge', 'bg-primary', 'me-1', 'mb-1');
         badge.innerHTML = `${user.Name} <button class="btn btn-danger btn-sm ms-1" onclick="removeUser{{item['jellyfin_id']}}('${user.UserId}')">×</button>`;
         assignedUsersDiv.appendChild(badge);
       });
@@ -103,7 +99,6 @@ function loadUsers{{item['jellyfin_id']}}() {
 }
 
 function removeUser{{item['jellyfin_id']}}(userId) {
-  // Example AJAX call to remove user
   fetch(`/admin/removeJellyfinUserFromPlaylist?user=${userId}&playlist={{item['jellyfin_id']}}`)
     .then(response => response.json())
     .then(data => {
@@ -115,7 +110,6 @@ function removeUser{{item['jellyfin_id']}}(userId) {
 
 document.getElementById("addUserButton-{{item['jellyfin_id']}}").addEventListener('click', function() {
   const userId = document.getElementById("availableUsers-{{item['jellyfin_id']}}").value;
-  // Example AJAX call to add user
   fetch(`/admin/addJellyfinUserToPlaylist?user=${userId}&playlist={{item['jellyfin_id']}}`)
     .then(response => response.json())
     .then(data => {
@@ -125,3 +119,4 @@ document.getElementById("addUserButton-{{item['jellyfin_id']}}").addEventListene
     });
 });
 </script>
+{% endif %}
