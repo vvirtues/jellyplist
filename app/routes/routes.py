@@ -449,6 +449,85 @@ def unlock_key():
         flash(f'Lock {key_name} released', category='success')
     return ''
 
+@app.route("/admin/getJellyfinUsers",methods = ['GET'])
+@functions.jellyfin_admin_required
+def get_jellyfin_users():
+    users = jellyfin.get_users(session_token=functions._get_api_token())
+    return jsonify({'users': users})
+
+
+@app.route("/admin/getJellyfinPlaylistUsers",methods = ['GET'])
+@functions.jellyfin_admin_required
+def get_jellyfin_playlist_users():
+    playlist_id = request.args.get('playlist')
+    if not playlist_id:
+        return jsonify({'error': 'Playlist not specified'}), 400
+    users = jellyfin.get_playlist_users(session_token=functions._get_api_token(), playlist_id=playlist_id)
+    all_users = jellyfin.get_users(session_token=functions._get_api_token())
+    # extend users with the username from all_users
+    for user in users:
+        user['Name'] = next((u['Name'] for u in all_users if u['Id'] == user['UserId']), None)
+    
+    # from all_users remove the users that are already in the playlist
+    all_users = [u for u in all_users if u['Id'] not in [user['UserId'] for user in users]]
+    
+    
+    return jsonify({'assigned_users': users, 'remaining_users': all_users})
+
+@app.route("/admin/removeJellyfinUserFromPlaylist", methods= ['GET'])
+@functions.jellyfin_admin_required
+def remove_jellyfin_user_from_playlist():
+    playlist_id = request.args.get('playlist')
+    user_id = request.args.get('user')
+    if not playlist_id or not user_id:
+        return jsonify({'error': 'Playlist or User not specified'}), 400
+    # remove this playlist also from the user in the database
+    # get the playlist from the db
+    playlist = Playlist.query.filter_by(jellyfin_id=playlist_id).first()
+    user = JellyfinUser.query.filter_by(jellyfin_user_id=user_id).first()
+    if not user:
+        # Add the user to the database if they don't exist
+        jellyfin_user = jellyfin.get_users(session_token=functions._get_api_token(), user_id=user_id)
+        user = JellyfinUser(name=jellyfin_user['Name'], jellyfin_user_id=jellyfin_user['Id'], is_admin = jellyfin_user['Policy']['IsAdministrator'])
+        db.session.add(user)
+        db.session.commit()
+
+    if not playlist or not user:
+        return jsonify({'error': 'Playlist or User not found'}), 400
+    if playlist in user.playlists:
+        user.playlists.remove(playlist)
+        db.session.commit()
+        
+    jellyfin.remove_user_from_playlist2(session_token=functions._get_api_token(), playlist_id=playlist_id, user_id=user_id, admin_user_id=functions._get_admin_id())
+    return jsonify({'success': True})
+
+@app.route('/admin/addJellyfinUserToPlaylist')
+@functions.jellyfin_admin_required
+def add_jellyfin_user_to_playlist():
+    playlist_id = request.args.get('playlist')
+    user_id = request.args.get('user')
+    # assign this playlist also to the user in the database
+    # get the playlist from the db
+    playlist = Playlist.query.filter_by(jellyfin_id=playlist_id).first()
+    user = JellyfinUser.query.filter_by(jellyfin_user_id=user_id).first()
+    if not user:
+        # Add the user to the database if they don't exist
+        jellyfin_user = jellyfin.get_users(session_token=functions._get_api_token(), user_id=user_id)
+        user = JellyfinUser(name=jellyfin_user['Name'], jellyfin_user_id=jellyfin_user['Id'], is_admin = jellyfin_user['Policy']['IsAdministrator'])
+        db.session.add(user)
+        db.session.commit()
+
+    if not playlist or not user:
+        return jsonify({'error': 'Playlist or User not found'}), 400
+    if playlist not in user.playlists:
+        user.playlists.append(playlist)
+        db.session.commit()
+    
+       
+    if not playlist_id or not user_id:
+        return jsonify({'error': 'Playlist or User not specified'}), 400
+    jellyfin.add_users_to_playlist(session_token=functions._get_api_token(), playlist_id=playlist_id, user_id=functions._get_admin_id(), user_ids=[user_id])
+    return jsonify({'success': True})
 
 @pl_bp.route('/test')
 def test():
