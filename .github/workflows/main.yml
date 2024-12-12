@@ -76,5 +76,7 @@ jobs:
           name: Release ${{ env.VERSION }}
           body: |
             ${{ env.CHANGELOG_CONTENT }}
+          generate_release_notes: true
+
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
