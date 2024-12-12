@@ -69,12 +69,12 @@ jobs:
           tags: |
             ghcr.io/${{ github.repository }}:${{ env.COMMIT_SHA }} 
             ghcr.io/${{ github.repository }}:${{ env.BRANCH_NAME }}
-            ghcr.io/${{ github.repository }}:${{ env.BRANCH_NAME }}-${{ env.VERSION }}
+            ghcr.io/${{ github.repository }}:${{ env.VERSION }}-${{ env.BRANCH_NAME}}
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: |
-            ${{ env.BRANCH_NAME }}-${{ env.VERSION }}
+            ${{ env.VERSION }}-${{ env.BRANCH_NAME }}
           name: |
             ${{ env.BRANCH_NAME }} Release ${{ env.VERSION }}
           body: |
