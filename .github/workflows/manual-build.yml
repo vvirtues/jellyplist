@@ -74,7 +74,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: |
-            ${{ env.VERSION }}-${{ env.BRANCH_NAME }}
+            ${{ env.VERSION }}-${{ env.BRANCH_NAME }}-${{ env.COMMIT_SHA }}
           name: |
             ${{ env.BRANCH_NAME }} Release ${{ env.VERSION }}
           body: |
