@@ -6,11 +6,13 @@
   <i class="fa-solid fa-users"> </i>
 </button>
 
-<div class="modal fade" id="addPlaylistModal-{{item['id']}}" tabindex="-1" aria-labelledby="addPlaylistModal-{{item['id']}}Label" aria-hidden="true" data-bs-modal-backdrop="false">
+<div class="modal fade" id="addPlaylistModal-{{item['id']}}" tabindex="-1" aria-labelledby="addPlaylistModal-{{item['id']}}Label" aria-hidden="true" data-bs-backdrop="false" >
   <div class="modal-dialog modal-lg modal-dialog-centered">
     <div class="modal-content">
       <div class="modal-header">
         <h5 class="modal-title" id="addPlaylistModal-{{item['id']}}Label">Select Additional Users</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+
       </div>
       <div class="modal-body">
         <div id="allUsers-{{item['id']}}">
@@ -26,7 +28,7 @@
 </div>
 
 <script>
-document.getElementById("add-playlist-admin-{{item['id']}}").addEventListener('click', function() {
+ document.getElementById("add-playlist-admin-{{item['id']}}").addEventListener('click', function() {
   var modal = new bootstrap.Modal(document.getElementById("addPlaylistModal-{{item['id']}}"));
   modal.show();
   loadAllUsers{{item['id']}}();
