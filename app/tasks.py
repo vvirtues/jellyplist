@@ -457,6 +457,7 @@ def update_jellyfin_id_for_downloaded_tracks(self):
                             
                             db.session.commit()
                         else:
+                            
                             app.logger.warning(f"No matching track found in Jellyfin for {track.name}.")
                         
                         spotify_track = None
@@ -466,13 +467,14 @@ def update_jellyfin_id_for_downloaded_tracks(self):
 
                     processed_tracks += 1
                     progress = (processed_tracks / total_tracks) * 100
+                    
                     self.update_state(state=f'{processed_tracks}/{total_tracks}: {track.name}', meta={'current': processed_tracks, 'total': total_tracks, 'percent': progress})
 
                 app.logger.info("Finished updating Jellyfin IDs for all tracks.")
                 return {'status': 'All tracks updated', 'total': total_tracks, 'processed': processed_tracks}
         except Exception as e:
-            app.logger.error(f"Error downloading tracks: {str(e)}", exc_info=True)
-            return {'status': 'Error downloading tracks'}
+            app.logger.error(f"Error updating jellyfin ids: {str(e)}", exc_info=True)
+            return {'status': 'Error updating jellyfin ids '}
         finally:
             task_manager.release_lock(lock_key)
     else:
@@ -609,6 +611,7 @@ def find_best_match_from_jellyfin(track: Track):
                         
                         app.logger.debug(f"\tQuality score for track {result['Name']}: {quality_score} [{result['Path']}]")
                         best_match = result
+                        best_quality_score = quality_score
                         break
                 
                 
@@ -645,8 +648,8 @@ def compute_quality_score(result, use_ffprobe=False) -> float:
     if result.get('HasLyrics'):
         score += 10
     
-    runtime_ticks = result.get('RunTimeTicks', 0)
-    score += runtime_ticks / 1e6
+    #runtime_ticks = result.get('RunTimeTicks', 0)
+    #score += runtime_ticks / 1e6
 
     if use_ffprobe:
         path = result.get('Path')
