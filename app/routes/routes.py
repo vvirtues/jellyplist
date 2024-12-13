@@ -3,7 +3,7 @@ import json
 import os
 import re
 from flask import Flask, Response, jsonify, render_template, request, redirect, url_for, session, flash, Blueprint, g
-from app import app, db, functions, jellyfin, read_dev_build_file, tasks
+from app import app, db, functions, jellyfin, read_dev_build_file, tasks, save_yaml_settings
 from app.classes import AudioProfile, CombinedPlaylistData
 from app.models import JellyfinUser,Playlist,Track
 from celery.result import AsyncResult
@@ -75,7 +75,6 @@ def task_manager():
     lock_keys.append('full_update_jellyfin_ids_lock')
     return render_template('admin/tasks.html', tasks=statuses,lock_keys = lock_keys)
 
-@app.route('/admin')
 @app.route('/admin/link_issues')
 @functions.jellyfin_admin_required
 def link_issues():
@@ -167,6 +166,23 @@ def get_logs_for_issue():
     logs = [re.sub(r'(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})', 'xxx.xxx.xxx.xxx', log) for log in logs]
     
     return jsonify({'logs': logs})
+
+@app.route('/admin')
+@app.route('/admin/settings')
+@app.route('/admin/settings/save' , methods=['POST'])   
+@functions.jellyfin_admin_required
+def admin_settings():
+    # if the request is a POST request, save the settings
+    if request.method == 'POST':
+        # from the form, get all values from default_playlist_users and join them to one array of strings
+        
+        app.config['runtime_settings']['default_playlist_users'] = request.form.getlist('default_playlist_users')
+        save_yaml_settings()
+        flash('Settings saved', category='success')
+        return redirect('/admin/settings')
+    return render_template('admin/settings.html',jellyfin_users = jellyfin.get_users(session_token=functions._get_api_token()))
+
+
 
 @app.route('/run_task/<task_name>', methods=['POST'])
 @functions.jellyfin_admin_required
