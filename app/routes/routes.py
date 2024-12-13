@@ -3,7 +3,7 @@ import json
 import os
 import re
 from flask import Flask, Response, jsonify, render_template, request, redirect, url_for, session, flash, Blueprint, g
-from app import app, db, functions, jellyfin, read_dev_build_file, tasks
+from app import app, db, functions, jellyfin, read_dev_build_file, tasks, save_yaml_settings
 from app.classes import AudioProfile, CombinedPlaylistData
 from app.models import JellyfinUser,Playlist,Track
 from celery.result import AsyncResult
@@ -68,13 +68,13 @@ def save_lidarr_config():
 @functions.jellyfin_admin_required
 def task_manager():
     statuses = {}
+    lock_keys = []
     for task_name, task_id in tasks.task_manager.tasks.items():
         statuses[task_name] = tasks.task_manager.get_task_status(task_name)
+        lock_keys.append(f"{task_name}_lock")
+    lock_keys.append('full_update_jellyfin_ids_lock')
+    return render_template('admin/tasks.html', tasks=statuses,lock_keys = lock_keys)
 
-    
-    return render_template('admin/tasks.html', tasks=statuses)
-
-@app.route('/admin')
 @app.route('/admin/link_issues')
 @functions.jellyfin_admin_required
 def link_issues():
@@ -107,6 +107,81 @@ def link_issues():
 
     return render_template('admin/link_issues.html' , tracks = tracks )
 
+@app.route('/admin/logs')
+@functions.jellyfin_admin_required
+def view_logs():
+    # parse the query parameter
+    log_name = request.args.get('name')
+    logs = []
+    if log_name == 'logs' or not log_name and os.path.exists('/var/log/jellyplist.log'):
+        with open('/var/log/jellyplist.log', 'r',encoding='utf-8') as f:
+            logs = f.readlines()
+    if log_name == 'worker' and os.path.exists('/var/log/jellyplist_worker.log'):
+        with open('/var/log/jellyplist_worker.log', 'r', encoding='utf-8') as f:
+            logs = f.readlines()
+    if log_name == 'beat' and os.path.exists('/var/log/jellyplist_beat.log'):
+        with open('/var/log/jellyplist_beat.log', 'r',encoding='utf-8') as f:
+            logs = f.readlines()
+    return render_template('admin/logview.html', logs=str.join('',logs),name=log_name)
+
+@app.route('/admin/setloglevel', methods=['POST'])
+@functions.jellyfin_admin_required
+def set_log_level():
+    loglevel = request.form.get('logLevel')
+    if loglevel:
+        if loglevel in ['DEBUG','INFO','WARNING','ERROR','CRITICAL']:
+            functions.set_log_level(loglevel)
+            flash(f'Log level set to {loglevel}', category='success')
+    return redirect(url_for('view_logs'))
+
+@app.route('/admin/logs/getLogsForIssue')
+@functions.jellyfin_admin_required
+def get_logs_for_issue():
+    # get the last 200 lines of all log files
+    last_lines = -300
+    logs = []
+    logs += f'## Logs and Details for Issue ##\n'
+    logs += f'Version: *{__version__}{read_dev_build_file()}*\n'    
+    if os.path.exists('/var/log/jellyplist.log'):
+        with open('/var/log/jellyplist.log', 'r',encoding='utf-8') as f:
+            logs += f'### jellyfin.log\n'    
+            logs += f'```log\n'    
+            logs += f.readlines()[last_lines:]
+            logs += f'```\n'    
+            
+    if os.path.exists('/var/log/jellyplist_worker.log'):
+        with open('/var/log/jellyplist_worker.log', 'r', encoding='utf-8') as f:
+            logs += f'### jellyfin_worker.log\n'    
+            logs += f'```log\n'    
+            logs += f.readlines()[last_lines:]
+            logs += f'```\n'     
+    
+    if os.path.exists('/var/log/jellyplist_beat.log'):
+        with open('/var/log/jellyplist_beat.log', 'r',encoding='utf-8') as f:
+            logs += f'### jellyplist_beat.log\n'    
+            logs += f'```log\n'    
+            logs += f.readlines()[last_lines:]
+            logs += f'```\n'       
+    # in the logs array, anonymize IP addresses
+    logs = [re.sub(r'(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})', 'xxx.xxx.xxx.xxx', log) for log in logs]
+    
+    return jsonify({'logs': logs})
+
+@app.route('/admin')
+@app.route('/admin/settings')
+@app.route('/admin/settings/save' , methods=['POST'])   
+@functions.jellyfin_admin_required
+def admin_settings():
+    # if the request is a POST request, save the settings
+    if request.method == 'POST':
+        # from the form, get all values from default_playlist_users and join them to one array of strings
+        
+        app.config['runtime_settings']['default_playlist_users'] = request.form.getlist('default_playlist_users')
+        save_yaml_settings()
+        flash('Settings saved', category='success')
+        return redirect('/admin/settings')
+    return render_template('admin/settings.html',jellyfin_users = jellyfin.get_users(session_token=functions._get_api_token()))
+
 
 
 @app.route('/run_task/<task_name>', methods=['POST'])
@@ -116,6 +191,7 @@ def run_task(task_name):
     
     # Rendere nur die aktualisierte Zeile der Task
     task_info = {task_name: {'state': status, 'info': info}}
+    
     return render_template('partials/_task_status.html', tasks=task_info)
 
 
@@ -123,12 +199,15 @@ def run_task(task_name):
 @functions.jellyfin_admin_required
 def task_status():
     statuses = {}
+    lock_keys = []
     for task_name, task_id in tasks.task_manager.tasks.items():
         statuses[task_name] = tasks.task_manager.get_task_status(task_name)
+        lock_keys.append(f"{task_name}_lock")
         
+    lock_keys.append('full_update_jellyfin_ids_lock')
 
     # Render the HTML partial template instead of returning JSON
-    return render_template('partials/_task_status.html', tasks=statuses)
+    return render_template('partials/_task_status.html', tasks=statuses, lock_keys = lock_keys)
 
 
 
@@ -180,7 +259,7 @@ def openPlaylist():
             try:
                 provider_client = MusicProviderRegistry.get_provider(provider_id)
                 extracted_playlist_id = provider_client.extract_playlist_id(playlist)
-                provider_playlist = provider_client.get_playlist(extracted_playlist_id)
+                provider_playlist = functions.get_cached_provider_playlist(extracted_playlist_id, provider_id)
                 
                 combined_data = functions.prepPlaylistData(provider_playlist)
                 if combined_data:
@@ -217,8 +296,8 @@ def browse_page(page_id):
 @functions.jellyfin_login_required
 def monitored_playlists():
 
-    # 1. Get all Playlists from the Database.
-    all_playlists = Playlist.query.all()
+    # 1. Get all Playlists from the Database and order them by Id    
+    all_playlists = Playlist.query.order_by(Playlist.id).all()
 
     # 2. Group them by provider
     playlists_by_provider = defaultdict(list)
@@ -236,7 +315,7 @@ def monitored_playlists():
 
         combined_playlists = []
         for pl in playlists:
-            provider_playlist = provider_client.get_playlist(pl.provider_playlist_id)
+            provider_playlist = functions.get_cached_provider_playlist(pl.provider_playlist_id,pl.provider_id)
             # 4. Convert the playlists to CombinedPlaylistData
             combined_data = functions.prepPlaylistData(provider_playlist)
             if combined_data:
@@ -380,13 +459,95 @@ def associate_track():
 @app.route("/unlock_key",methods = ['POST'])
 @functions.jellyfin_admin_required
 def unlock_key():
-     
     key_name = request.form.get('inputLockKey')
     if key_name:
-        tasks.release_lock(key_name)
+        tasks.task_manager.release_lock(key_name)
         flash(f'Lock {key_name} released', category='success')
     return ''
 
+@app.route("/admin/getJellyfinUsers",methods = ['GET'])
+@functions.jellyfin_admin_required
+def get_jellyfin_users():
+    users = jellyfin.get_users(session_token=functions._get_api_token())
+    return jsonify({'users': users})
+
+
+@app.route("/admin/getJellyfinPlaylistUsers",methods = ['GET'])
+@functions.jellyfin_admin_required
+def get_jellyfin_playlist_users():
+    playlist_id = request.args.get('playlist')
+    if not playlist_id:
+        return jsonify({'error': 'Playlist not specified'}), 400
+    users = jellyfin.get_playlist_users(session_token=functions._get_api_token(), playlist_id=playlist_id)
+    all_users = jellyfin.get_users(session_token=functions._get_api_token())
+    # extend users with the username from all_users
+    for user in users:
+        user['Name'] = next((u['Name'] for u in all_users if u['Id'] == user['UserId']), None)
+    
+    # from all_users remove the users that are already in the playlist
+    all_users = [u for u in all_users if u['Id'] not in [user['UserId'] for user in users]]
+    
+    
+    return jsonify({'assigned_users': users, 'remaining_users': all_users})
+
+@app.route("/admin/removeJellyfinUserFromPlaylist", methods= ['GET'])
+@functions.jellyfin_admin_required
+def remove_jellyfin_user_from_playlist():
+    playlist_id = request.args.get('playlist')
+    user_id = request.args.get('user')
+    if not playlist_id or not user_id:
+        return jsonify({'error': 'Playlist or User not specified'}), 400
+    # remove this playlist also from the user in the database
+    # get the playlist from the db
+    playlist = Playlist.query.filter_by(jellyfin_id=playlist_id).first()
+    user = JellyfinUser.query.filter_by(jellyfin_user_id=user_id).first()
+    if not user:
+        # Add the user to the database if they don't exist
+        jellyfin_user = jellyfin.get_users(session_token=functions._get_api_token(), user_id=user_id)
+        user = JellyfinUser(name=jellyfin_user['Name'], jellyfin_user_id=jellyfin_user['Id'], is_admin = jellyfin_user['Policy']['IsAdministrator'])
+        db.session.add(user)
+        db.session.commit()
+
+    if not playlist or not user:
+        return jsonify({'error': 'Playlist or User not found'}), 400
+    if playlist in user.playlists:
+        user.playlists.remove(playlist)
+        db.session.commit()
+        
+    jellyfin.remove_user_from_playlist2(session_token=functions._get_api_token(), playlist_id=playlist_id, user_id=user_id, admin_user_id=functions._get_admin_id())
+    return jsonify({'success': True})
+
+@app.route('/admin/addJellyfinUserToPlaylist')
+@functions.jellyfin_admin_required
+def add_jellyfin_user_to_playlist():
+    playlist_id = request.args.get('playlist')
+    user_id = request.args.get('user')
+    return add_jellyfin_user_to_playlist_internal(user_id, playlist_id)
+    
+    
+def add_jellyfin_user_to_playlist_internal(user_id, playlist_id):
+    # assign this playlist also to the user in the database
+    # get the playlist from the db
+    playlist = Playlist.query.filter_by(jellyfin_id=playlist_id).first()
+    user = JellyfinUser.query.filter_by(jellyfin_user_id=user_id).first()
+    if not user:
+        # Add the user to the database if they don't exist
+        jellyfin_user = jellyfin.get_users(session_token=functions._get_api_token(), user_id=user_id)
+        user = JellyfinUser(name=jellyfin_user['Name'], jellyfin_user_id=jellyfin_user['Id'], is_admin = jellyfin_user['Policy']['IsAdministrator'])
+        db.session.add(user)
+        db.session.commit()
+
+    if not playlist or not user:
+        return jsonify({'error': 'Playlist or User not found'}), 400
+    if playlist not in user.playlists:
+        user.playlists.append(playlist)
+        db.session.commit()
+
+        
+    if not playlist_id or not user_id:
+        return jsonify({'error': 'Playlist or User not specified'}), 400
+    jellyfin.add_users_to_playlist(session_token=functions._get_api_token(), playlist_id=playlist_id, user_id=functions._get_admin_id(), user_ids=[user_id])
+    return jsonify({'success': True})
 
 @pl_bp.route('/test')
 def test():

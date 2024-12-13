@@ -21,7 +21,7 @@ from lidarr.classes import Artist
 
 @signals.celeryd_init.connect
 def setup_log_format(sender, conf, **kwargs):
-    FORMAT = "[%(asctime)s][%(filename)18s:%(lineno)4s - %(funcName)23s() ] %(levelname)7s - %(message)s"  
+    FORMAT = "[%(asctime)s][%(filename)18s:%(lineno)4s - %(funcName)42s() ] %(levelname)7s - %(message)s"  
     
     conf.worker_log_format = FORMAT.strip().format(sender)
     conf.worker_task_log_format = FORMAT.format(sender)
@@ -94,6 +94,9 @@ def update_all_playlists_track_status(self):
 
                 app.logger.info("All playlists' track statuses updated.")
                 return {'status': 'All playlists updated', 'total': total_playlists, 'processed': processed_playlists}
+        except Exception as e:
+            app.logger.error(f"Error downloading tracks: {str(e)}", exc_info=True)
+            return {'status': 'Error downloading tracks'}
         finally:
             task_manager.release_lock(lock_key)
     else:
@@ -125,6 +128,7 @@ def download_missing_tracks(self):
                     return {'status': 'No undownloaded tracks found'}
 
                 app.logger.info(f"Found {total_tracks} tracks to download.")
+                app.logger.debug(f"output_dir: {output_dir}")
                 processed_tracks = 0
                 failed_downloads = 0
                 for track in undownloaded_tracks:
@@ -136,11 +140,39 @@ def download_missing_tracks(self):
                         'failed': failed_downloads
                     })
                     # Check if the track already exists in the output directory
-                    file_path = f"{output_dir.replace('{track-id}', track.provider_track_id)}.mp3"
+                    if os.getenv('SPOTDL_OUTPUT_FORMAT') == '__jellyplist/{track-id}':
+                        file_path = f"{output_dir.replace('{track-id}', track.provider_track_id)}"
+                    else:
+                        # if the output format is other than the default, we need to fetch the track first! 
+                        spotify_track = functions.get_cached_provider_track(track.provider_track_id, provider_id="Spotify")
+                        # spotify_track has name, artists, album and id
+                        # name needs to be mapped to {title}
+                        # artist[0] needs to be mapped to {artist}
+                        # artists needs to be mapped to {artists}
+                        # album needs to be mapped to {album} , but needs to be checked if it is set or not, because it is Optional
+                        # id needs to be mapped to {track-id}
+                        # the output format is then used to create the file path
+                        if spotify_track:
+                            
+                            file_path = output_dir.replace("{title}",spotify_track.name)
+                            file_path = file_path.replace("{artist}",spotify_track.artists[0].name)
+                            file_path = file_path.replace("{artists}",",".join([artist.name for artist in spotify_track.artists]))
+                            file_path = file_path.replace("{album}",spotify_track.album.name if spotify_track.album else "")
+                            file_path = file_path.replace("{track-id}",spotify_track.id)
+                            app.logger.debug(f"File path: {file_path}")
+                    
+                    if not file_path:
+                        app.logger.error(f"Error creating file path for track {track.name}.")
+                        failed_downloads += 1
+                        track.download_status = "Error creating file path"
+                        db.session.commit()
+                        continue
+                    
+                                           
+                                            
                     # region search before download
                     if search_before_download:
                         app.logger.info(f"Searching for track in Jellyfin: {track.name}")
-                        spotify_track = functions.get_cached_provider_track(track.provider_track_id, provider_id="Spotify")
                         # at first try to find the track without fingerprinting it
                         best_match = find_best_match_from_jellyfin(track)
                         if best_match:
@@ -186,13 +218,13 @@ def download_missing_tracks(self):
                         #endregion
                                 
                     #endregion 
-                    
-                    if os.path.exists(file_path):
-                        app.logger.info(f"Track {track.name} is already downloaded at {file_path}. Marking as downloaded.")
-                        track.downloaded = True
-                        track.filesystem_path = file_path
-                        db.session.commit()
-                        continue
+                    if file_path:
+                        if os.path.exists(file_path):
+                            app.logger.info(f"Track {track.name} is already downloaded at {file_path}. Marking as downloaded.")
+                            track.downloaded = True
+                            track.filesystem_path = file_path
+                            db.session.commit()
+                            continue
 
                     
 
@@ -211,12 +243,17 @@ def download_missing_tracks(self):
                             app.logger.debug(f"Found {cookie_file}, using it for spotDL")
                             command.append("--cookie-file")
                             command.append(cookie_file)
+                        if app.config['SPOTDL_PROXY']:
+                            app.logger.debug(f"Using proxy: {app.config['SPOTDL_PROXY']}")
+                            command.append("--proxy")
+                            command.append(app.config['SPOTDL_PROXY'])
 
                         result = subprocess.run(command, capture_output=True, text=True, timeout=90)
-                        if result.returncode == 0 and os.path.exists(file_path):
+                        if result.returncode == 0:
                             track.downloaded = True
-                            track.filesystem_path = file_path
-                            app.logger.info(f"Track {track.name} downloaded successfully to {file_path}.")
+                            if file_path:
+                                track.filesystem_path = file_path
+                                app.logger.info(f"Track {track.name} downloaded successfully to {file_path}.")
                         else:
                             app.logger.error(f"Download failed for track {track.name}.")
                             if result.stdout:
@@ -248,6 +285,9 @@ def download_missing_tracks(self):
                     'processed': processed_tracks,
                     'failed': failed_downloads
                 }
+        except Exception as e:
+            app.logger.error(f"Error downloading tracks: {str(e)}", exc_info=True)
+            return {'status': 'Error downloading tracks'}
         finally:
             task_manager.release_lock(lock_key)
             if app.config['REFRESH_LIBRARIES_AFTER_DOWNLOAD_TASK']:
@@ -360,6 +400,9 @@ def check_for_playlist_updates(self):
                         app.logger.info(f"Processed {processed_playlists}/{total_playlists} playlists.")
 
                 return {'status': 'Playlist update check completed', 'total': total_playlists, 'processed': processed_playlists}
+        except Exception as e:
+            app.logger.error(f"Error downloading tracks: {str(e)}", exc_info=True)
+            return {'status': 'Error downloading tracks'}
         finally:
             task_manager.release_lock(lock_key)
     else:
@@ -375,11 +418,18 @@ def update_jellyfin_id_for_downloaded_tracks(self):
             app.logger.info("Starting Jellyfin ID update for tracks...")
 
             with app.app_context():
-                downloaded_tracks = Track.query.filter_by(downloaded=True, jellyfin_id=None).all()
                 
+                downloaded_tracks = Track.query.filter(
+                    Track.downloaded == True,
+                    Track.jellyfin_id == None,
+                    (Track.quality_score < app.config['QUALITY_SCORE_THRESHOLD']) | (Track.quality_score == None)
+                ).all()
                 if task_manager.acquire_lock(full_update_key, expiration=60*60*24):
                     app.logger.info(f"performing full update on jellyfin track ids. (Update tracks and playlists if better quality will be found)")
-                    downloaded_tracks = Track.query.all()
+                    app.logger.info(f"\tQUALITY_SCORE_THRESHOLD = {app.config['QUALITY_SCORE_THRESHOLD']}")
+                    downloaded_tracks = Track.query.filter(
+                        (Track.quality_score < app.config['QUALITY_SCORE_THRESHOLD']) | (Track.quality_score == None)
+                    ).all()
                 else:
                     app.logger.debug(f"doing update on tracks with downloaded = True and jellyfin_id = None")
                 total_tracks = len(downloaded_tracks)
@@ -393,6 +443,7 @@ def update_jellyfin_id_for_downloaded_tracks(self):
                 for track in downloaded_tracks:
                     try:
                         best_match = find_best_match_from_jellyfin(track)
+                        
                         if best_match:
                             track.downloaded = True
                             if track.jellyfin_id != best_match['Id']:
@@ -402,10 +453,11 @@ def update_jellyfin_id_for_downloaded_tracks(self):
                                 track.filesystem_path = best_match['Path']
                                 app.logger.info(f"Updated filesystem_path for track: {track.name} ({track.provider_track_id})")
                                 
-                                
+                            track.quality_score = best_match['quality_score']    
                             
                             db.session.commit()
                         else:
+                            
                             app.logger.warning(f"No matching track found in Jellyfin for {track.name}.")
                         
                         spotify_track = None
@@ -415,11 +467,14 @@ def update_jellyfin_id_for_downloaded_tracks(self):
 
                     processed_tracks += 1
                     progress = (processed_tracks / total_tracks) * 100
+                    
                     self.update_state(state=f'{processed_tracks}/{total_tracks}: {track.name}', meta={'current': processed_tracks, 'total': total_tracks, 'percent': progress})
 
                 app.logger.info("Finished updating Jellyfin IDs for all tracks.")
                 return {'status': 'All tracks updated', 'total': total_tracks, 'processed': processed_tracks}
-
+        except Exception as e:
+            app.logger.error(f"Error updating jellyfin ids: {str(e)}", exc_info=True)
+            return {'status': 'Error updating jellyfin ids '}
         finally:
             task_manager.release_lock(lock_key)
     else:
@@ -502,6 +557,9 @@ def request_lidarr(self):
 
                     app.logger.info(f'Requests sent to Lidarr. Total items: {total_items}')
                     return {'status': 'Request sent to Lidarr'}
+                except Exception as e:
+                    app.logger.error(f"Error downloading tracks: {str(e)}", exc_info=True)
+                    return {'status': 'Error downloading tracks'}
                 finally:
                     task_manager.release_lock(lock_key)
     
@@ -553,6 +611,7 @@ def find_best_match_from_jellyfin(track: Track):
                         
                         app.logger.debug(f"\tQuality score for track {result['Name']}: {quality_score} [{result['Path']}]")
                         best_match = result
+                        best_quality_score = quality_score
                         break
                 
                 
@@ -563,7 +622,9 @@ def find_best_match_from_jellyfin(track: Track):
                     if quality_score > best_quality_score:
                         best_match = result
                         best_quality_score = quality_score
-
+        # attach the quality_score to the best_match
+        if best_match:
+            best_match['quality_score'] = best_quality_score
         return best_match
     except Exception as e:
         app.logger.error(f"Error searching Jellyfin for track {track.name}: {str(e)}")
@@ -587,8 +648,8 @@ def compute_quality_score(result, use_ffprobe=False) -> float:
     if result.get('HasLyrics'):
         score += 10
     
-    runtime_ticks = result.get('RunTimeTicks', 0)
-    score += runtime_ticks / 1e6
+    #runtime_ticks = result.get('RunTimeTicks', 0)
+    #score += runtime_ticks / 1e6
 
     if use_ffprobe:
         path = result.get('Path')
@@ -619,7 +680,7 @@ class TaskManager:
             raise ValueError(f"Task {task_name} is not defined.")
         task = globals()[task_name].delay(*args, **kwargs)
         self.tasks[task_name] = task.id
-        return task.id
+        return task.id,'STARTED'
 
     def get_task_status(self, task_name):
         if task_name not in self.tasks:

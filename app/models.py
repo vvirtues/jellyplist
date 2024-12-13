@@ -50,7 +50,7 @@ playlist_tracks = db.Table('playlist_tracks',
 
 class Track(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(150), nullable=False)
+    name = db.Column(db.String(200), nullable=False)
     provider_track_id = db.Column(db.String(120), unique=True, nullable=False)
     provider_uri = db.Column(db.String(120), unique=True, nullable=False)
     downloaded = db.Column(db.Boolean())
@@ -58,9 +58,12 @@ class Track(db.Model):
     jellyfin_id = db.Column(db.String(120), nullable=True)  # Add Jellyfin track ID field
     download_status = db.Column(db.String(2048), nullable=True)
     provider_id = db.Column(db.String(20))
+    
 
     # Many-to-Many relationship with Playlists
     playlists = db.relationship('Playlist', secondary=playlist_tracks, back_populates='tracks')
+    
     lidarr_processed = db.Column(db.Boolean(), default=False)
+    quality_score = db.Column(db.Float(), default=0)
     def __repr__(self):
         return f'<Track {self.name}:{self.provider_track_id}>'

@@ -8,7 +8,7 @@ WORKDIR /jellyplist
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 RUN apt update 
-RUN apt install ffmpeg netcat-openbsd -y
+RUN apt install ffmpeg netcat-openbsd supervisor -y
 # Copy the application code
 COPY . .
 COPY entrypoint.sh /entrypoint.sh
@@ -16,6 +16,7 @@ RUN chmod +x /entrypoint.sh
 
 # Expose the port the app runs on
 EXPOSE 5055
+COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
 
 # Set the entrypoint
@@ -23,4 +24,4 @@ ENTRYPOINT ["/entrypoint.sh"]
 
 
 # Run the application
-CMD ["python", "run.py"]
+CMD ["supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]

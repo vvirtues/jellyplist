@@ -1,6 +1,8 @@
 from logging.handlers import RotatingFileHandler
 import os
+import threading
 import time
+import yaml
 from flask_socketio import SocketIO
 
 import sys
@@ -97,14 +99,37 @@ app = Flask(__name__, template_folder="../templates", static_folder='../static')
 
 
 app.config.from_object(Config)
+app.config['runtime_settings'] = {}
+yaml_file = 'settings.yaml'
+def load_yaml_settings():
+    with open(yaml_file, 'r') as f:
+        app.config['runtime_settings'] =  yaml.safe_load(f)
+def save_yaml_settings():
+    with open(yaml_file, 'w') as f:
+        yaml.dump(app.config['runtime_settings'], f)
+
+
 for handler in app.logger.handlers:
     app.logger.removeHandler(handler)
+
 
 log_level = getattr(logging, app.config['LOG_LEVEL'], logging.INFO)  # Default to DEBUG if invalid
 app.logger.setLevel(log_level)
 
-FORMAT = "[%(asctime)s][%(filename)18s:%(lineno)4s - %(funcName)20s() ] %(levelname)7s - %(message)s" 
+FORMAT = "[%(asctime)s][%(filename)18s:%(lineno)4s - %(funcName)36s() ] %(levelname)7s - %(message)s" 
 logging.basicConfig(format=FORMAT)
+
+# Add RotatingFileHandler to log to a file
+# if worker is in sys.argv, we are running a celery worker, so we log to a different file
+if 'worker' in sys.argv:
+    log_file = os.path.join("/var/log/", 'jellyplist_worker.log')
+elif 'beat' in sys.argv:
+    log_file = os.path.join("/var/log/", 'jellyplist_beat.log')
+else:
+    log_file = os.path.join("/var/log/", 'jellyplist.log')
+file_handler = RotatingFileHandler(log_file, maxBytes=2 * 1024 * 1024, backupCount=10)
+file_handler.setFormatter(logging.Formatter(FORMAT))
+app.logger.addHandler(file_handler)
 
 Config.validate_env_vars()
 cache = Cache(app)
@@ -185,3 +210,28 @@ if app.config['LIDARR_API_KEY'] and app.config['LIDARR_URL']:
     app.logger.info(f'Creating Lidarr Client with URL: {app.config["LIDARR_URL"]}')
     from lidarr.client import LidarrClient
     lidarr_client = LidarrClient(app.config['LIDARR_URL'], app.config['LIDARR_API_KEY'])
+
+
+
+        
+
+if os.path.exists(yaml_file):
+    app.logger.info('Loading runtime settings from settings.yaml')
+    load_yaml_settings()
+    # def watch_yaml_file(yaml_file, interval=30):
+    #     last_mtime = os.path.getmtime(yaml_file)
+    #     while True:
+    #         time.sleep(interval)
+    #         current_mtime = os.path.getmtime(yaml_file)
+    #         if current_mtime != last_mtime:
+    #             last_mtime = current_mtime
+    #             yaml_settings = load_yaml_settings(yaml_file)
+    #             app.config.update(yaml_settings)
+    #             app.logger.info(f"Reloaded YAML settings from {yaml_file}")
+
+    # watcher_thread = threading.Thread(
+    #     target=watch_yaml_file,
+    #     args=('settings.yaml',),
+    #     daemon=True
+    # )
+    # watcher_thread.start()

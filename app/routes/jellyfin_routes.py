@@ -9,7 +9,7 @@ from app.tasks import task_manager
 
 from app.registry.music_provider_registry import MusicProviderRegistry
 from jellyfin.objects import PlaylistMetadata
-from app.routes import pl_bp
+from app.routes import pl_bp, routes
 
 @app.route('/jellyfin_playlists')
 @functions.jellyfin_login_required
@@ -34,7 +34,10 @@ def jellyfin_playlists():
 
             combined_playlists = []
             for pl in playlists:
-                provider_playlist = provider_client.get_playlist(pl.provider_playlist_id)
+                # Use the cached provider_playlist_id to fetch the playlist from the provider
+                provider_playlist = functions.get_cached_provider_playlist(pl.provider_playlist_id,pl.provider_id)
+                #provider_playlist = provider_client.get_playlist(pl.provider_playlist_id)
+                
                 # 4. Convert the playlists to CombinedPlaylistData
                 combined_data = functions.prepPlaylistData(provider_playlist)
                 if combined_data:
@@ -50,6 +53,13 @@ def jellyfin_playlists():
 def add_playlist():
     playlist_id = request.form.get('item_id')  
     playlist_name = request.form.get('item_name')  
+    additional_users = None
+    if not playlist_id and request.data:
+        # get data convert from json to dict
+        data = request.get_json()
+        playlist_id = data.get('item_id')
+        playlist_name = data.get('item_name')
+        additional_users = data.get('additional_users')
     # also get the provider id from the query params
     provider_id = request.args.get('provider')
     if not playlist_id:
@@ -119,6 +129,13 @@ def add_playlist():
             "can_remove":True,
             "jellyfin_id" : playlist.jellyfin_id
         }
+        if additional_users and session['is_admin']:
+            db.session.commit()
+            app.logger.debug(f"Additional users: {additional_users}")
+            for user_id in additional_users:
+                routes.add_jellyfin_user_to_playlist_internal(user_id,playlist.jellyfin_id)
+            
+        
         return render_template('partials/_add_remove_button.html',item= item)
             
             

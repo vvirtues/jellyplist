@@ -32,8 +32,20 @@ jobs:
       - name: Extract Version
         id: extract_version
         run: |
-          version=$(python3 -c "import version; print(f'${{ env.BRANCH_NAME}}-{version.__version__}')")
+          version=$(python3 -c "import version; print(f'{version.__version__}')")
           echo "VERSION=$version" >> $GITHUB_ENV
+
+      - name: Read Changelog
+        id: changelog
+        run: |
+          if [ -f changelogs/${{ env.VERSION }}.md ]; then
+            changelog_content=$(cat changelogs/${{ env.VERSION }}.md)
+            echo "CHANGELOG_CONTENT<<EOF" >> $GITHUB_ENV
+            echo "$changelog_content" >> $GITHUB_ENV
+            echo "EOF" >> $GITHUB_ENV
+          else
+            echo "CHANGELOG_CONTENT=No changelog available for this release." >> $GITHUB_ENV
+          fi
 
       # Set up Docker
       - name: Set up Docker Buildx
@@ -56,13 +68,17 @@ jobs:
           push: true
           tags: |
             ghcr.io/${{ github.repository }}:${{ env.COMMIT_SHA }} 
-            ghcr.io/${{ github.repository }}:dev 
-            ghcr.io/${{ github.repository }}:${{ env.VERSION }}
+            ghcr.io/${{ github.repository }}:${{ env.BRANCH_NAME }}
+            ghcr.io/${{ github.repository }}:${{ env.VERSION }}-${{ env.BRANCH_NAME}}
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ env.VERSION }}
-          name: Dev Release ${{ env.VERSION }}
+          tag_name: |
+            ${{ env.VERSION }}-${{ env.BRANCH_NAME }}-${{ env.COMMIT_SHA }}
+          name: |
+            ${{ env.BRANCH_NAME }} Release ${{ env.VERSION }}
+          body: |
+            ${{ env.CHANGELOG_CONTENT }}
           generate_release_notes: true
           make_latest: false
           
