@@ -118,6 +118,23 @@ class JellyfinClient:
             return {"status": "success", "message": "Playlist updated successfully"}
         else:
             raise Exception(f"Failed to update playlist: {response.content}")
+        
+    def get_music_playlist(self, session_token : str, playlist_id: str):
+        """
+        Get a music playlist by its ID.
+        :param playlist_id: The ID of the playlist to fetch.
+        :return: The playlist object
+        """
+        url = f'{self.base_url}/Playlists/{playlist_id}'
+        self.logger.debug(f"Url={url}")
+
+        response = requests.get(url, headers=self._get_headers(session_token=session_token), timeout = self.timeout)
+        self.logger.debug(f"Response = {response.status_code}")
+
+        if response.status_code == 200:
+            return response.json()
+        else:
+            raise Exception(f"Failed to get playlist: {response.content}")
 
     def get_playlist_metadata(self, session_token: str, user_id: str,playlist_id: str) -> PlaylistMetadata:
         url = f'{self.base_url}/Items/{playlist_id}'
