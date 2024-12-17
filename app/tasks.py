@@ -344,6 +344,13 @@ def check_for_playlist_updates(self):
                                             db.session.commit()
                                             app.logger.info(f'Added new track: {track.name}')
                                         tracks_to_add.append((track, idx))
+                                    # else check if the track is already in the playlist and change the track_order in the playlist_tracks table
+                                    else:
+                                        app.logger.debug(f"track {track_info.track.name} moved to position {idx}")
+                                        track = existing_tracks[track_id]
+                                        stmt = playlist_tracks.update().where(playlist_tracks.c.playlist_id == playlist.id).where(playlist_tracks.c.track_id == track.id).values(track_order=idx)
+                                        db.session.execute(stmt)
+                                        db.session.commit()
 
                             tracks_to_remove = [
                                 existing_tracks[track_id] 
@@ -385,6 +392,7 @@ def check_for_playlist_updates(self):
                         ).all()
 
                         tracks = [track.jellyfin_id for track, idx in ordered_tracks if track.jellyfin_id is not None]
+                        #jellyfin.remove_songs_from_playlist(session_token=jellyfin_admin_token, playlist_id=playlist.jellyfin_id, song_ids=tracks)
                         jellyfin.add_songs_to_playlist(session_token=jellyfin_admin_token, user_id=jellyfin_admin_id, playlist_id=playlist.jellyfin_id, song_ids=tracks)
                         #endregion
                     except Exception as e:
