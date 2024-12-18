@@ -9,8 +9,9 @@
         <p>{{ item.track_count }} songs, {{ total_duration }}</p>
         <p>Last Updated: {{ item.last_updated | human_datetime}} | Last Change: {{ item.last_changed | human_datetime}}</p>
         {% include 'partials/_add_remove_button.html' %}
-        {% if session['is_admin'] and item.jellyfin_id %}
         <p>
+          {{item.jellyfin_id | jellyfin_link_button}}
+          {% if session['is_admin'] and item.jellyfin_id %}
             <button id="refresh-playlist-btn" class="btn btn-primary mt-2">Refresh Playlist in Jellyfin</button>
             <script>
             document.getElementById('refresh-playlist-btn').addEventListener('click', function() {
@@ -29,8 +30,8 @@
               });
             });
             </script>
-        </p>
-        {% endif %}
+            {% endif %}
+          </p>
       </div>
 
     </div>

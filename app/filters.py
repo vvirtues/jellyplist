@@ -98,6 +98,17 @@ def jellyfin_link(jellyfin_id: str) -> Markup:
     link = f"{jellyfin_server_url}/web/#/details?id={jellyfin_id}"
     return Markup(f'<a href="{link}" target="_blank">{jellyfin_id}</a>')
 
+@template_filter('jellyfin_link_button')
+def jellyfin_link_btn(jellyfin_id: str) -> Markup:
+
+    jellyfin_server_url = app.config.get('JELLYFIN_SERVER_URL')
+    if not jellyfin_server_url:
+        return Markup(f"<span style='color: red;'>JELLYFIN_SERVER_URL not configured</span>")
+
+    link = f"{jellyfin_server_url}/web/#/details?id={jellyfin_id}"
+    return Markup(f'<a href="{link}" class="btn btn-primary mt-2" target="_blank">Open in Jellyfin</a>')
+
+
 # A template filter for displaying a datetime in a human-readable format
 @template_filter('human_datetime')
 def human_datetime(dt) -> str:
