@@ -97,3 +97,8 @@ def jellyfin_link(jellyfin_id: str) -> Markup:
 
     link = f"{jellyfin_server_url}/web/#/details?id={jellyfin_id}"
     return Markup(f'<a href="{link}" target="_blank">{jellyfin_id}</a>')
+
+# A template filter for displaying a datetime in a human-readable format
+@template_filter('human_datetime')
+def human_datetime(dt) -> str:
+    return dt.strftime('%Y-%m-%d %H:%M:%S')

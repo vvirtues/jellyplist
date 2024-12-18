@@ -7,7 +7,7 @@
         <h1>{{ item.name }}</h1>
         <p>{{ item.description }}</p>
         <p>{{ item.track_count }} songs, {{ total_duration }}</p>
-        <p>Last Updated: {{ item.last_updated}} | Last Change: {{ item.last_changed}}</p>
+        <p>Last Updated: {{ item.last_updated | human_datetime}} | Last Change: {{ item.last_changed | human_datetime}}</p>
         {% include 'partials/_add_remove_button.html' %}
         {% if session['is_admin'] and item.jellyfin_id %}
         <p>
