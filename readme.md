@@ -44,13 +44,13 @@ MUSIC_STORAGE_BASE_PATH = '/storage/media/music' # The base path where your musi
 # SPOTDL_PROXY = http://proxy:8080
 # SPOTDL_OUTPUT_FORMAT = "/{artist}/{artists} - {title}" # Supported variables: {title}, {artist},{artists}, {album}, Will be joined with to get a complete path
 
-# SEARCH_JELLYFIN_BEFORE_DOWNLOAD = false # defaults to true, before attempting to do a download with spotDL , the song will be searched first in the local library
+# SEARCH_JELLYFIN_BEFORE_DOWNLOAD = false # defaults to true, before attempting to do a download with spotDL , the song will be searched first in the local library ("true" MAY INCURE PERFORMENCE ISSUES)
 
 # START_DOWNLOAD_AFTER_PLAYLIST_ADD = true # defaults to false, If a new Playlist is added, the Download Task will be scheduled immediately
 
 # FIND_BEST_MATCH_USE_FFPROBE = true # Use ffprobe to gather quality details from a file to calculate quality score. Otherwise jellyplist will use details provided by jellyfin. defaults to false. 
 
-#REFRESH_LIBRARIES_AFTER_DOWNLOAD_TASK = true # jellyplist will trigger a music library update on your Jellyfin server, in case you dont have `Realtime Monitoring` enabled on your Jellyfin library. Defaults to false.
+#REFRESH_LIBRARIES_AFTER_DOWNLOAD_TASK = true # jellyplist will trigger a music library update on your Jellyfin server, in case you dont have `Realtime Monitoring` enabled on your Jellyfin library. Defaults to false. ("true" MAY INCURE PERFORMENCE ISSUES)
 
 # LOG_LEVEL = DEBUG # Defaults to INFO
 
