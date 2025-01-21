@@ -1,6 +1,8 @@
 import os
 import sys
 
+import app
+
 class Config:
     LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO').upper()
     SECRET_KEY = os.getenv('SECRET_KEY')  
@@ -37,16 +39,24 @@ class Config:
     QUALITY_SCORE_THRESHOLD = float(os.getenv('QUALITY_SCORE_THRESHOLD',1000.0))
     # SpotDL specific configuration
     SPOTDL_CONFIG = {
-        'cookie_file': '/jellyplist/cookies.txt',
-        # combine the path provided in MUSIC_STORAGE_BASE_PATH with the following path __jellyplist/{track-id} to get the value for output
-        
         'threads': 12
     }
+    # combine the path provided in MUSIC_STORAGE_BASE_PATH with the SPOTDL_OUTPUT_FORMAT to get the value for output      
     if os.getenv('MUSIC_STORAGE_BASE_PATH'):
-        
-        output_path = os.path.join(MUSIC_STORAGE_BASE_PATH,SPOTDL_OUTPUT_FORMAT)
-        
+        # Ensure MUSIC_STORAGE_BASE_PATH ends with "__jellyplist"
+        if not MUSIC_STORAGE_BASE_PATH.endswith("__jellyplist"):
+            MUSIC_STORAGE_BASE_PATH += "__jellyplist"
+
+        # Ensure SPOTDL_OUTPUT_FORMAT does not start with "/"
+        normalized_spotdl_output_format = SPOTDL_OUTPUT_FORMAT.lstrip("/").replace(" ", "_")
+
+        # Join the paths
+        output_path = os.path.join(MUSIC_STORAGE_BASE_PATH, normalized_spotdl_output_format)
+
         SPOTDL_CONFIG.update({'output': output_path})
+        
+    if SPOTIFY_COOKIE_FILE:
+        SPOTDL_CONFIG.update({'cookie_file': SPOTIFY_COOKIE_FILE})
     
     @classmethod
     def validate_env_vars(cls):
