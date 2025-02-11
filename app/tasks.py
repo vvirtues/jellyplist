@@ -113,8 +113,8 @@ def download_missing_tracks(self):
             app.logger.info("Starting track download job...")
 
             with app.app_context():
-                spotdl_config = app.config['SPOTDL_CONFIG']
-                cookie_file = spotdl_config['cookie_file']
+                spotdl_config: dict = app.config['SPOTDL_CONFIG']
+                cookie_file = spotdl_config.get('cookie_file', None)
                 output_dir = spotdl_config['output']
                 client_id = app.config['SPOTIFY_CLIENT_ID']
                 client_secret = app.config['SPOTIFY_CLIENT_SECRET']
@@ -239,7 +239,7 @@ def download_missing_tracks(self):
                             "--client-id", client_id,
                             "--client-secret", client_secret
                         ]
-                        if os.path.exists(cookie_file):
+                        if cookie_file and os.path.exists(cookie_file):
                             app.logger.debug(f"Found {cookie_file}, using it for spotDL")
                             command.append("--cookie-file")
                             command.append(cookie_file)
@@ -247,7 +247,8 @@ def download_missing_tracks(self):
                             app.logger.debug(f"Using proxy: {app.config['SPOTDL_PROXY']}")
                             command.append("--proxy")
                             command.append(app.config['SPOTDL_PROXY'])
-
+                        
+                        app.logger.info(f"Executing the spotDL command: {' '.join(command)}")
                         result = subprocess.run(command, capture_output=True, text=True, timeout=90)
                         if result.returncode == 0:
                             track.downloaded = True

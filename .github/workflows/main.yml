@@ -1,9 +1,12 @@
 name: Build and Release on Tag
 
 on:
-  push:
-    branches:
-      - main
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Branch to build the Docker image from'
+        required: true
+        default: 'main'
 
 jobs:
   build-and-publish:
@@ -73,5 +76,7 @@ jobs:
           name: Release ${{ env.VERSION }}
           body: |
             ${{ env.CHANGELOG_CONTENT }}
+          generate_release_notes: true
+
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

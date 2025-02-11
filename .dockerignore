@@ -11,7 +11,12 @@ __pycache__/
 .DS_Store
 
 # Ignore Git files
-.git
+.git*
 *cookies*
 set_env.sh
 jellyplist.code-workspace
+
+# Ignore GitHub page related files
+changelogs
+readme.md
+screenshots
