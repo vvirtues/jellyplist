@@ -112,4 +112,6 @@ def jellyfin_link_btn(jellyfin_id: str) -> Markup:
 # A template filter for displaying a datetime in a human-readable format
 @template_filter('human_datetime')
 def human_datetime(dt) -> str:
+    if not dt:
+        return 'No date provided'
     return dt.strftime('%Y-%m-%d %H:%M:%S')
