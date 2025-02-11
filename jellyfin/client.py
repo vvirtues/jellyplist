@@ -257,7 +257,8 @@ class JellyfinClient:
             
             'IncludeItemTypes': 'Audio',  # Search only for audio items
             'Recursive': 'true',          # Search within all folders
-            'Fields': 'Name,Id,Album,Artists,Path'           # Retrieve the name and ID of the song
+            'Fields': 'Name,Id,Album,Artists,Path',           # Retrieve the name and ID of the song
+            'Limit': 100
         }
         self.logger.debug(f"Url={url}")
         
@@ -272,29 +273,37 @@ class JellyfinClient:
 
     def add_songs_to_playlist(self, session_token: str, user_id: str, playlist_id: str, song_ids: list[str]):
         """
-        Add songs to an existing playlist.
+        Add songs to an existing playlist in batches to prevent URL length issues.
         :param playlist_id: The ID of the playlist to update.
         :param song_ids: A list of song IDs to add.
         :return: A success message.
         """
-        # Construct the API URL with query parameters
+        # Construct the API URL without query parameters
         url = f'{self.base_url}/Playlists/{playlist_id}/Items'
-        params = {
-            'ids': ','.join(song_ids),  # Comma-separated song IDs
-            'userId': user_id
-        }
+        batch_size = 50
+        total_songs = len(song_ids)
+        self.logger.debug(f"Total songs to add: {total_songs}")
 
-        self.logger.debug(f"Url={url}")
-        
-        # Send the request to Jellyfin API with query parameters
-        response = requests.post(url, headers=self._get_headers(session_token=session_token), params=params, timeout = self.timeout)
-        self.logger.debug(f"Response = {response.status_code}")
+        for i in range(0, total_songs, batch_size):
+            batch = song_ids[i:i + batch_size]
+            params = {
+                'ids': ','.join(batch),  # Comma-separated song IDs
+                'userId': user_id
+            }
+            self.logger.debug(f"Url={url} - Adding batch: {batch}")
 
-        # Check for success
-        if response.status_code == 204:  # 204 No Content indicates success
-            return {"status": "success", "message": "Songs added to playlist successfully"}
-        else:
-            raise Exception(f"Failed to add songs to playlist: {response.status_code} - {response.content}")
+            response = requests.post(
+                url,
+                headers=self._get_headers(session_token=session_token),
+                params=params,
+                timeout=self.timeout
+            )
+            self.logger.debug(f"Response = {response.status_code}")
+
+            if response.status_code != 204:  # 204 No Content indicates success
+                raise Exception(f"Failed to add songs to playlist: {response.status_code} - {response.content}")
+
+        return {"status": "success", "message": "Songs added to playlist successfully"}
 
     def remove_songs_from_playlist(self, session_token: str, playlist_id: str, song_ids):
         """
@@ -303,19 +312,25 @@ class JellyfinClient:
         :param song_ids: A list of song IDs to remove.
         :return: A success message.
         """
-        url = f'{self.base_url}/Playlists/{playlist_id}/Items'
-        params = {
-            'EntryIds': ','.join(song_ids)  # Join song IDs with commas
-        }
-        self.logger.debug(f"Url={url}")
-        
-        response = requests.delete(url, headers=self._get_headers(session_token=session_token), params=params, timeout = self.timeout)
-        self.logger.debug(f"Response = {response.status_code}")
+        batch_size = 50
+        total_songs = len(song_ids)
+        self.logger.debug(f"Total songs to remove: {total_songs}")
 
-        if response.status_code == 204:  # 204 No Content indicates success for updating
-            return {"status": "success", "message": "Songs removed from playlist successfully"}
-        else:
-            raise Exception(f"Failed to remove songs from playlist: {response.content}")
+        for i in range(0, total_songs, batch_size):
+            batch = song_ids[i:i + batch_size]
+            url = f'{self.base_url}/Playlists/{playlist_id}/Items'
+            params = {
+                'EntryIds': ','.join(batch)  # Join song IDs with commas
+            }
+            self.logger.debug(f"Url={url} - Removing batch: {batch}")
+
+            response = requests.delete(url, headers=self._get_headers(session_token=session_token), params=params, timeout=self.timeout)
+            self.logger.debug(f"Response = {response.status_code}")
+
+            if response.status_code != 204:  # 204 No Content indicates success for updating
+                raise Exception(f"Failed to remove songs from playlist: {response.content}")
+
+        return {"status": "success", "message": "Songs removed from playlist successfully"}
 
     def remove_item(self, session_token: str, playlist_id: str):  
         """
