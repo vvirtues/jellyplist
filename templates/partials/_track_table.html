@@ -6,7 +6,6 @@
       <th scope="col">Artist</th>
       <th scope="col">Duration</th>
       <th scope="col">{{provider_id}}</th>
-      <th scope="col">Preview</th>
       <th scope="col">Status</th>
       <th scope="col">Jellyfin</th>
     </tr>
@@ -25,18 +24,7 @@
           <i class="fab fa-{{ track.provider_id.lower() }} fa-lg"></i>
         </a>
       </td>
-      <td>
-        {% if track.preview_url %}
-        <button class="btn btn-sm btn-primary" onclick="playPreview(this, '{{ track.preview_url }}')"
-          data-bs-toggle="tooltip" title="Play Preview">
-          <i class="fas fa-play"></i>
-        </button>
-        {% else %}
-        <span data-bs-toggle="tooltip" title="No Preview Available">
-          <button class="btn btn-sm" disabled><i class="fas fa-ban"></i></button>
-        </span>
-        {% endif %}
-      </td>
+      
       <td>
         {% if not track.downloaded %}
         <button class="btn btn-sm btn-danger" data-bs-toggle="tooltip"

@@ -18,3 +18,8 @@ eventlet
 pydub
 fuzzywuzzy
 pyyaml
+click
+pycryptodomex
+mutagen
+requests
+deezer-py

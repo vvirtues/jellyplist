@@ -170,6 +170,37 @@ def delete_playlist(playlist_id):
     except Exception as e:
         flash(f'Failed to remove item: {str(e)}')
     
+@app.route('/refresh_playlist/<playlist_id>', methods=['GET'])
+@functions.jellyfin_admin_required
+def refresh_playlist(playlist_id):
+    # get the playlist from the database using the playlist_id
+    playlist = Playlist.query.filter_by(jellyfin_id=playlist_id).first()
+    # if the playlist has a jellyfin_id, then fetch the playlist from Jellyfin
+    if playlist.jellyfin_id:
+        try:
+            app.logger.debug(f"removing all tracks from playlist {playlist.jellyfin_id}")
+            jellyfin_playlist = jellyfin.get_music_playlist(session_token=functions._get_api_token(), playlist_id=playlist.jellyfin_id)  
+            jellyfin.remove_songs_from_playlist(session_token=functions._get_token_from_sessioncookie(), playlist_id=playlist.jellyfin_id, song_ids=[track for track in jellyfin_playlist['ItemIds']])
+            ordered_tracks = db.session.execute(
+                            db.select(Track, playlist_tracks.c.track_order)
+                            .join(playlist_tracks, playlist_tracks.c.track_id == Track.id)
+                            .where(playlist_tracks.c.playlist_id == playlist.id)
+                            .order_by(playlist_tracks.c.track_order)
+                        ).all()
+
+            tracks = [track.jellyfin_id for track, idx in ordered_tracks if track.jellyfin_id is not None]
+            #jellyfin.remove_songs_from_playlist(session_token=jellyfin_admin_token, playlist_id=playlist.jellyfin_id, song_ids=tracks)
+            jellyfin.add_songs_to_playlist(session_token=functions._get_api_token(), user_id=functions._get_admin_id(), playlist_id=playlist.jellyfin_id, song_ids=tracks)
+            # if the playlist is found, then update the playlist metadata
+            provider_playlist = MusicProviderRegistry.get_provider(playlist.provider_id).get_playlist(playlist.provider_playlist_id)
+            functions.update_playlist_metadata(playlist, provider_playlist)
+            flash('Playlist refreshed')
+            return jsonify({'success': True})
+                
+        except Exception as e:
+            flash(f'Failed to refresh playlist: {str(e)}')
+            return jsonify({'success': False})
+        
 
 @app.route('/wipe_playlist/<playlist_id>', methods=['DELETE'])
 @functions.jellyfin_admin_required

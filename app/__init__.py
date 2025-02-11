@@ -206,6 +206,12 @@ spotify_client.authenticate()
 from .registry import MusicProviderRegistry
 MusicProviderRegistry.register_provider(spotify_client)
 
+if app.config['ENABLE_DEEZER']:
+    from .providers import DeezerClient
+    deezer_client = DeezerClient()
+    deezer_client.authenticate()
+    MusicProviderRegistry.register_provider(deezer_client)
+
 if app.config['LIDARR_API_KEY'] and app.config['LIDARR_URL']:
     app.logger.info(f'Creating Lidarr Client with URL: {app.config["LIDARR_URL"]}')
     from lidarr.client import LidarrClient

@@ -7,8 +7,32 @@
         <h1>{{ item.name }}</h1>
         <p>{{ item.description }}</p>
         <p>{{ item.track_count }} songs, {{ total_duration }}</p>
-        <p>Last Updated: {{ item.last_updated}} | Last Change: {{ item.last_changed}}</p>
+        <p>Last Updated: {{ item.last_updated | human_datetime}} | Last Change: {{ item.last_changed | human_datetime}}</p>
         {% include 'partials/_add_remove_button.html' %}
+        <p>
+          {{item.jellyfin_id | jellyfin_link_button}}
+          {% if session['is_admin'] and item.jellyfin_id %}
+            <button id="refresh-playlist-btn" class="btn btn-primary mt-2">Refresh Playlist in Jellyfin</button>
+            <script>
+            document.getElementById('refresh-playlist-btn').addEventListener('click', function() {
+              fetch(`/refresh_playlist/{{item.jellyfin_id}}`)
+              .then(response => response.json())
+              .then(data => {
+                if (data.success) {
+                alert('Playlist refreshed successfully');
+                } else {
+                alert('Failed to refresh playlist');
+                }
+              })
+              .catch(error => {
+                console.error('Error:', error);
+                alert('An error occurred while refreshing the playlist');
+              });
+            });
+            </script>
+            {% endif %}
+          </p>
       </div>
+
     </div>
   </div>
